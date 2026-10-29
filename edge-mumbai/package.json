@@ -1,0 +1,25 @@
+{
+  "name": "streamcloud-edge-mumbai",
+  "version": "1.0.0",
+  "description": "StreamCloud CDN Edge Server - Mumbai Node (Port 4002)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "cdn",
+    "edge-server",
+    "video-streaming",
+    "cache",
+    "mumbai"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}
