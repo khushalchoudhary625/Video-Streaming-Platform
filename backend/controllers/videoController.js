@@ -1,77 +1,107 @@
 const fs = require("fs");
 const path = require("path");
+const http = require("http");
 const Video = require("../models/Video");
 
-// @desc    Get all videos
+// Helper to safely fetch metrics from an edge server
+const fetchEdgeMetrics = (url) => {
+    return new Promise((resolve) => {
+        const parsed = new URL(url);
+        const req = http.get(
+            {
+                hostname: parsed.hostname,
+                port: parsed.port,
+                path: parsed.pathname,
+                timeout: 1500
+            },
+            (res) => {
+                let data = "";
+                res.on("data", (chunk) => (data += chunk));
+                res.on("end", () => {
+                    try {
+                        const json = JSON.parse(data);
+                        resolve({ online: true, ...json });
+                    } catch (e) {
+                        resolve({ online: false, error: "Invalid JSON response" });
+                    }
+                });
+            }
+        );
+
+        req.on("timeout", () => {
+            req.destroy();
+            resolve({ online: false, error: "Connection timed out" });
+        });
+
+        req.on("error", (err) => {
+            resolve({ online: false, error: err.message });
+        });
+    });
+};
+
+// @desc    Get all videos from MongoDB
 // @route   GET /api/videos
 const getVideos = async (req, res) => {
     try {
-        // Query MongoDB first
-        let dbVideos = [];
-        try {
-            dbVideos = await Video.find().sort({ createdAt: -1 });
-        } catch (dbErr) {
-            console.warn("DB query warning in getVideos:", dbErr.message);
-        }
-
-        if (dbVideos && dbVideos.length > 0) {
-            const formatted = dbVideos.map((v) => ({
-                id: v._id.toString(),
-                title: v.title,
-                description: v.description,
-                filename: v.filename,
-                url: v.url,
-                size: v.size,
-                views: v.views,
-                duration: v.duration,
-                uploadDate: new Date(v.createdAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric"
-                }),
-                uploaderName: v.uploaderName,
-                isUserUploaded: true
-            }));
-            return res.json(formatted);
-        }
-
-        // Fallback: Read uploads folder directly if DB is empty
         const uploadsDir = path.join(__dirname, "../uploads");
-        if (!fs.existsSync(uploadsDir)) {
-            return res.json([]);
+
+        // Sync any physical files in uploads/ into MongoDB if not present
+        if (fs.existsSync(uploadsDir)) {
+            const files = fs.readdirSync(uploadsDir);
+            const videoFiles = files.filter(
+                (file) => !file.startsWith(".") && /\.(mp4|webm|ogg|mov|mkv)$/i.test(file)
+            );
+
+            for (const file of videoFiles) {
+                try {
+                    const exists = await Video.findOne({ filename: file });
+                    if (!exists) {
+                        const stats = fs.statSync(path.join(uploadsDir, file));
+                        const cleanTitle = file
+                            .replace(/^\d+-/, "")
+                            .replace(/\.[^/.]+$/, "")
+                            .replace(/[-_]/g, " ");
+
+                        await Video.create({
+                            title: cleanTitle ? cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1) : file,
+                            description: `Uploaded video stream file (${(stats.size / (1024 * 1024)).toFixed(1)} MB)`,
+                            filename: file,
+                            url: `/videos/${file}`,
+                            size: stats.size,
+                            views: 0,
+                            duration: "04:15",
+                            uploaderName: "Admin",
+                            createdAt: stats.birthtime || stats.mtime
+                        });
+                    }
+                } catch (syncErr) {
+                    // Ignore duplicate key or sync error
+                }
+            }
         }
 
-        const files = fs.readdirSync(uploadsDir);
-        const videoFiles = files.filter((file) =>
-            !file.startsWith(".") && /\.(mp4|webm|ogg|mov|mkv)$/i.test(file)
-        );
+        // Query all videos from MongoDB
+        const dbVideos = await Video.find().sort({ createdAt: -1 });
 
-        const fileVideos = videoFiles.map((file, index) => {
-            const stats = fs.statSync(path.join(uploadsDir, file));
-            const cleanTitle = file
-                .replace(/^\d+-/, "")
-                .replace(/\.[^/.]+$/, "")
-                .replace(/[-_]/g, " ");
+        const formatted = dbVideos.map((v) => ({
+            id: v._id.toString(),
+            title: v.title,
+            description: v.description,
+            filename: v.filename,
+            url: v.url,
+            size: v.size,
+            views: v.views || 0,
+            duration: v.duration || "04:15",
+            uploadDate: new Date(v.createdAt).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric"
+            }),
+            uploaderName: v.uploaderName || "Admin",
+            isUserUploaded: true
+        }));
 
-            return {
-                id: file,
-                title: cleanTitle ? cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1) : `Uploaded Video ${index + 1}`,
-                filename: file,
-                url: `/videos/${file}`,
-                description: `CDN Origin stored video (${(stats.size / (1024 * 1024)).toFixed(1)} MB)`,
-                views: Math.floor(Math.random() * 1500) + 120,
-                duration: "04:15",
-                uploadDate: new Date(stats.mtime).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric"
-                }),
-                size: stats.size,
-                isUserUploaded: true
-            };
-        });
-
-        res.json(fileVideos);
+        res.json(formatted);
     } catch (error) {
         console.error("Get videos error:", error);
         res.status(500).json({ message: "Unable to load videos" });
@@ -100,28 +130,23 @@ const uploadVideo = async (req, res) => {
         const videoUrl = `/videos/${req.file.filename}`;
 
         // Save to MongoDB
-        let savedVideo = null;
-        try {
-            savedVideo = await Video.create({
-                title,
-                description,
-                filename: req.file.filename,
-                url: videoUrl,
-                size: req.file.size,
-                views: 1,
-                duration: req.body.duration || "04:30",
-                uploader: req.user ? req.user._id : null,
-                uploaderName: req.user ? req.user.name : "Admin"
-            });
-        } catch (dbErr) {
-            console.warn("DB save warning for video:", dbErr.message);
-        }
+        const savedVideo = await Video.create({
+            title,
+            description,
+            filename: req.file.filename,
+            url: videoUrl,
+            size: req.file.size,
+            views: 0,
+            duration: req.body.duration || "04:30",
+            uploader: req.user ? req.user._id : null,
+            uploaderName: req.user ? req.user.name : "Admin"
+        });
 
         res.status(201).json({
             message: "Video uploaded successfully to CDN origin storage",
             filename: req.file.filename,
             url: videoUrl,
-            video: savedVideo ? {
+            video: {
                 id: savedVideo._id.toString(),
                 title: savedVideo.title,
                 description: savedVideo.description,
@@ -131,16 +156,6 @@ const uploadVideo = async (req, res) => {
                 views: savedVideo.views,
                 uploadDate: "Just now",
                 uploaderName: savedVideo.uploaderName,
-                isUserUploaded: true
-            } : {
-                id: req.file.filename,
-                title,
-                description,
-                filename: req.file.filename,
-                url: videoUrl,
-                size: req.file.size,
-                views: 1,
-                uploadDate: "Just now",
                 isUserUploaded: true
             }
         });
@@ -152,54 +167,186 @@ const uploadVideo = async (req, res) => {
     }
 };
 
-// @desc    Get Cloud & CDN Performance Metrics (Admin Only)
-// @route   GET /api/videos/metrics
-const getCloudMetrics = async (req, res) => {
+// @desc    Increment video view count
+// @route   POST /api/videos/:id/view
+const incrementViewCount = async (req, res) => {
     try {
-        let videoCount = 0;
-        let totalSize = 0;
+        const { id } = req.params;
+        let video = null;
 
-        try {
-            videoCount = await Video.countDocuments();
-            const videos = await Video.find().select("size");
-            totalSize = videos.reduce((acc, curr) => acc + (curr.size || 0), 0);
-        } catch (err) {
-            // fallback size from files
-            const uploadsDir = path.join(__dirname, "../uploads");
-            if (fs.existsSync(uploadsDir)) {
-                const files = fs.readdirSync(uploadsDir);
-                videoCount = files.length;
-                totalSize = files.reduce((acc, f) => {
-                    try {
-                        return acc + fs.statSync(path.join(uploadsDir, f)).size;
-                    } catch (e) {
-                        return acc;
-                    }
-                }, 0);
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+            video = await Video.findByIdAndUpdate(
+                id,
+                { $inc: { views: 1 } },
+                { new: true }
+            );
+        } else {
+            video = await Video.findOneAndUpdate(
+                { filename: id },
+                { $inc: { views: 1 } },
+                { new: true }
+            );
+        }
+
+        if (!video) {
+            return res.status(404).json({ message: "Video not found" });
+        }
+
+        res.json({
+            success: true,
+            views: video.views
+        });
+    } catch (error) {
+        console.error("Increment view error:", error);
+        res.status(500).json({ message: "Failed to update view count" });
+    }
+};
+
+// @desc    Delete video (Admin Only)
+// @route   DELETE /api/videos/:id
+const deleteVideo = async (req, res) => {
+    try {
+        const { id } = req.params;
+        let video = null;
+
+        if (id.match(/^[0-9a-fA-F]{24}$/)) {
+            video = await Video.findById(id);
+        } else {
+            video = await Video.findOne({ filename: id });
+        }
+
+        if (!video) {
+            return res.status(404).json({ message: "Video not found" });
+        }
+
+        // Delete physical file from uploads folder
+        const uploadsDir = path.join(__dirname, "../uploads");
+        const filePath = path.join(uploadsDir, video.filename);
+        if (fs.existsSync(filePath)) {
+            try {
+                fs.unlinkSync(filePath);
+            } catch (unlinkErr) {
+                console.warn("Could not delete physical video file:", unlinkErr.message);
             }
         }
 
-        const sizeInMB = (totalSize / (1024 * 1024)).toFixed(1);
+        // Delete from MongoDB
+        await Video.findByIdAndDelete(video._id);
 
         res.json({
-            cdnCacheHitRate: "87.4%",
-            averageLatency: "42 ms",
-            activeUsers: 124,
-            bandwidth: "18.4 MB/s",
-            originRequests: "12.6%",
-            streamingServers: "3 Active Nodes",
-            totalVideosStored: videoCount,
-            storageUsedMB: `${sizeInMB} MB`,
-            edgeRegions: ["us-east-1", "eu-central-1", "ap-south-1"],
-            health: "Optimal"
+            success: true,
+            message: `Video "${video.title}" deleted successfully`,
+            id: video._id.toString()
         });
     } catch (error) {
-        res.status(500).json({ message: "Failed to fetch cloud metrics" });
+        console.error("Delete video error:", error);
+        res.status(500).json({ message: "Failed to delete video: " + error.message });
+    }
+};
+
+// @desc    Get Real Cloud & CDN Performance Metrics (Admin Only)
+// @route   GET /api/videos/metrics
+const getCloudMetrics = async (req, res) => {
+    try {
+        // Query MongoDB for storage and video count
+        const videoCount = await Video.countDocuments();
+        const videos = await Video.find().select("size");
+        const totalSizeBytes = videos.reduce((acc, curr) => acc + (curr.size || 0), 0);
+        const storageUsedMB = (totalSizeBytes / (1024 * 1024)).toFixed(2);
+
+        // Fetch live metrics from Delhi (4001) and Mumbai (4002) in parallel
+        const [delhiMetrics, mumbaiMetrics] = await Promise.all([
+            fetchEdgeMetrics("http://localhost:4001/metrics"),
+            fetchEdgeMetrics("http://localhost:4002/metrics")
+        ]);
+
+        // Aggregate actual live edge metrics
+        const delhiHits = (delhiMetrics.online && delhiMetrics.metrics?.cacheHits) || 0;
+        const delhiMisses = (delhiMetrics.online && delhiMetrics.metrics?.cacheMisses) || 0;
+        const delhiOriginFetches = (delhiMetrics.online && delhiMetrics.metrics?.originFetches) || 0;
+        const delhiBytes = (delhiMetrics.online && delhiMetrics.metrics?.bytesServed) || 0;
+
+        const mumbaiHits = (mumbaiMetrics.online && mumbaiMetrics.metrics?.cacheHits) || 0;
+        const mumbaiMisses = (mumbaiMetrics.online && mumbaiMetrics.metrics?.cacheMisses) || 0;
+        const mumbaiOriginFetches = (mumbaiMetrics.online && mumbaiMetrics.metrics?.originFetches) || 0;
+        const mumbaiBytes = (mumbaiMetrics.online && mumbaiMetrics.metrics?.bytesServed) || 0;
+
+        const totalHits = delhiHits + mumbaiHits;
+        const totalMisses = delhiMisses + mumbaiMisses;
+        const totalRequests = totalHits + totalMisses;
+        const totalOriginRequests = delhiOriginFetches + mumbaiOriginFetches;
+        const totalBytesServed = delhiBytes + mumbaiBytes;
+        const totalBandwidthMB = (totalBytesServed / (1024 * 1024)).toFixed(2);
+
+        const overallHitRatio = totalRequests > 0
+            ? `${((totalHits / totalRequests) * 100).toFixed(1)}%`
+            : "0.0%";
+
+        let activeEdgeServers = 0;
+        if (delhiMetrics.online) activeEdgeServers++;
+        if (mumbaiMetrics.online) activeEdgeServers++;
+
+        // Combine activity logs
+        const delhiLogs = (delhiMetrics.online && delhiMetrics.recentActivity) || [];
+        const mumbaiLogs = (mumbaiMetrics.online && mumbaiMetrics.recentActivity) || [];
+        const combinedLogs = [...delhiLogs, ...mumbaiLogs]
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            .slice(0, 30);
+
+        res.json({
+            overview: {
+                totalRequests,
+                cacheHits: totalHits,
+                cacheMisses: totalMisses,
+                hitRatio: overallHitRatio,
+                originRequests: totalOriginRequests,
+                bandwidthServedMB: totalBandwidthMB,
+                activeEdgeServers,
+                totalVideosStored: videoCount,
+                originStorageUsedMB: `${storageUsedMB} MB`
+            },
+            delhi: {
+                edge: "Delhi",
+                port: 4001,
+                online: delhiMetrics.online,
+                totalRequests: delhiHits + delhiMisses,
+                cacheHits: delhiHits,
+                cacheMisses: delhiMisses,
+                hitRatio: delhiMetrics.online ? (delhiMetrics.metrics?.hitRatio || "0.0%") : "N/A",
+                originFetches: delhiOriginFetches,
+                bytesServedMB: delhiMetrics.online ? (delhiMetrics.metrics?.bytesServedMB || "0.00") : "0.00",
+                cacheStorageUsedMB: delhiMetrics.online ? (delhiMetrics.cache?.totalCacheSizeMB || "0.00") : "0.00",
+                cachedFiles: delhiMetrics.online ? (delhiMetrics.cache?.cachedFiles || 0) : 0,
+                uptimeSeconds: delhiMetrics.uptimeSeconds || 0,
+                recentActivity: delhiLogs
+            },
+            mumbai: {
+                edge: "Mumbai",
+                port: 4002,
+                online: mumbaiMetrics.online,
+                totalRequests: mumbaiHits + mumbaiMisses,
+                cacheHits: mumbaiHits,
+                cacheMisses: mumbaiMisses,
+                hitRatio: mumbaiMetrics.online ? (mumbaiMetrics.metrics?.hitRatio || "0.0%") : "N/A",
+                originFetches: mumbaiOriginFetches,
+                bytesServedMB: mumbaiMetrics.online ? (mumbaiMetrics.metrics?.bytesServedMB || "0.00") : "0.00",
+                cacheStorageUsedMB: mumbaiMetrics.online ? (mumbaiMetrics.cache?.totalCacheSizeMB || "0.00") : "0.00",
+                cachedFiles: mumbaiMetrics.online ? (mumbaiMetrics.cache?.cachedFiles || 0) : 0,
+                uptimeSeconds: mumbaiMetrics.uptimeSeconds || 0,
+                recentActivity: mumbaiLogs
+            },
+            recentActivity: combinedLogs
+        });
+    } catch (error) {
+        console.error("Metrics aggregation error:", error);
+        res.status(500).json({ message: "Failed to fetch cloud metrics: " + error.message });
     }
 };
 
 module.exports = {
     getVideos,
     uploadVideo,
+    incrementViewCount,
+    deleteVideo,
     getCloudMetrics
 };
