@@ -13,9 +13,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Connect to Database
-connectDB();
-
 // Serve uploaded videos statically
 app.use(
     "/videos",
@@ -41,6 +38,12 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+// Connect to Database first, then start listening
+const startServer = async () => {
+    await connectDB();
+    app.listen(PORT, () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+    });
+};
+
+startServer();

@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import VideoPlayer from "../components/VideoPlayer";
 import CloudDashboard from "../components/CloudDashboard";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
-export default function Watch({ videos = [], showCloudStats }) {
+export default function Watch({ videos = [], showCloudStats, onDeleteVideo, onViewIncrement }) {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -13,8 +13,29 @@ export default function Watch({ videos = [], showCloudStats }) {
 
   // Find target video from state or videos list
   const currentVideo = location.state?.video || videos.find((v) => String(v.id) === String(id));
+  const [viewTracked, setViewTracked] = useState(false);
 
   const recommended = videos.filter((v) => String(v.id) !== String(id));
+
+  // Handler when video starts playing to increment views in MongoDB
+  const handlePlay = async (videoId) => {
+    if (viewTracked) return;
+    setViewTracked(true);
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/videos/${videoId}/view`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.views && onViewIncrement) {
+          onViewIncrement(videoId, data.views);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not increment views:", err.message);
+    }
+  };
 
   if (!currentVideo) {
     return (
@@ -45,7 +66,12 @@ export default function Watch({ videos = [], showCloudStats }) {
         Back
       </button>
 
-      <VideoPlayer video={currentVideo} recommendedVideos={recommended} />
+      <VideoPlayer 
+        video={currentVideo} 
+        recommendedVideos={recommended} 
+        onPlay={handlePlay}
+        onDeleteVideo={onDeleteVideo}
+      />
     </div>
   );
 }

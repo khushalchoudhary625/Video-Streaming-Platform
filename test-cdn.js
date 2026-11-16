@@ -177,6 +177,43 @@ async function runTests() {
     if (res.statusCode !== 404) throw new Error(`Expected 404, got ${res.statusCode}`);
   });
 
+  // 9. Real Telemetry & Metrics Verification
+  await test("Delhi /metrics returns real hits, misses, and recentActivity", async () => {
+    const res = await makeRequest(`${DELHI_URL}/metrics`);
+    if (res.statusCode !== 200) throw new Error(`Expected 200, got ${res.statusCode}`);
+    if (typeof res.bodyJson?.metrics?.cacheHits !== "number" || res.bodyJson?.metrics?.cacheHits < 1) {
+      throw new Error(`Expected at least 1 cache hit, got ${res.bodyJson?.metrics?.cacheHits}`);
+    }
+    if (typeof res.bodyJson?.metrics?.cacheMisses !== "number" || res.bodyJson?.metrics?.cacheMisses < 1) {
+      throw new Error(`Expected at least 1 cache miss, got ${res.bodyJson?.metrics?.cacheMisses}`);
+    }
+    if (!Array.isArray(res.bodyJson?.recentActivity) || res.bodyJson?.recentActivity.length === 0) {
+      throw new Error(`Expected non-empty recentActivity log array`);
+    }
+  });
+
+  await test("Mumbai /metrics returns real stats independently", async () => {
+    const res = await makeRequest(`${MUMBAI_URL}/metrics`);
+    if (res.statusCode !== 200) throw new Error(`Expected 200, got ${res.statusCode}`);
+    if (typeof res.bodyJson?.metrics?.cacheHits !== "number") {
+      throw new Error(`Expected numeric cacheHits`);
+    }
+    if (!Array.isArray(res.bodyJson?.recentActivity)) {
+      throw new Error(`Expected recentActivity array`);
+    }
+  });
+
+  // 10. View Increment & Backend Metrics Aggregation
+  await test("Video View increment via POST /api/videos/:id/view", async () => {
+    const res = await makeRequest(`${ORIGIN_URL}/api/videos/${TEST_VIDEO}/view`, {
+      method: "POST"
+    });
+    if (res.statusCode !== 200) throw new Error(`Expected 200, got ${res.statusCode}`);
+    if (typeof res.bodyJson?.views !== "number") {
+      throw new Error(`Expected views number in response`);
+    }
+  });
+
   console.log("\n========================================================");
   console.log(`  Results: ${passed} Passed, ${failed} Failed`);
   console.log("========================================================\n");
