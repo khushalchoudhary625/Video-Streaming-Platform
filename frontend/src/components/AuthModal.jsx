@@ -32,21 +32,6 @@ export default function AuthModal() {
     }
   };
 
-  const handleQuickDemoLogin = async (demoRole) => {
-    setError("");
-    setLoading(true);
-    try {
-      if (demoRole === "admin") {
-        await login("admin@streamcloud.com", "admin123");
-      } else {
-        await login("user@streamcloud.com", "user123");
-      }
-    } catch (err) {
-      setError(err.message || "Demo login failed.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="modal-overlay" onClick={closeAuthModal}>
@@ -196,31 +181,6 @@ export default function AuthModal() {
             )}
           </button>
         </form>
-
-        <div className="demo-login-divider">
-          <span>Quick Demo Access (College Evaluation)</span>
-        </div>
-
-        <div className="demo-buttons-row">
-          <button
-            type="button"
-            className="btn-demo-login admin"
-            onClick={() => handleQuickDemoLogin("admin")}
-            disabled={loading}
-          >
-            <ShieldCheck size={16} />
-            <span>Admin Demo</span>
-          </button>
-          <button
-            type="button"
-            className="btn-demo-login user"
-            onClick={() => handleQuickDemoLogin("user")}
-            disabled={loading}
-          >
-            <User size={16} />
-            <span>Student User Demo</span>
-          </button>
-        </div>
       </div>
     </div>
   );
