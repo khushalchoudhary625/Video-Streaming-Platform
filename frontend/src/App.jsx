@@ -8,45 +8,8 @@ import UploadPage from "./pages/Upload";
 import AuthModal from "./components/AuthModal";
 import { AuthProvider } from "./context/AuthContext";
 
-// Sample initial demo videos for Cloud Computing presentation
-const INITIAL_DEMO_VIDEOS = [
-  {
-    id: "demo-cloud-1",
-    title: "Introduction to Cloud Computing & CDN Architecture",
-    description: "Learn how content delivery networks (CDNs) distribute video content globally with minimal latency, edge caching, and origin shield servers.",
-    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    thumbnail: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=80",
-    views: 1245,
-    uploadDate: "2 days ago",
-    duration: "09:56",
-    isUserUploaded: false
-  },
-  {
-    id: "demo-cloud-2",
-    title: "High Performance Video Streaming Protocols (HLS & DASH)",
-    description: "Deep dive into adaptive bitrate streaming, chunking media segments, and optimizing throughput across edge nodes.",
-    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=80",
-    views: 540,
-    uploadDate: "3 days ago",
-    duration: "10:53",
-    isUserUploaded: false
-  },
-  {
-    id: "demo-cloud-3",
-    title: "CDN Edge Cache Hit Ratio & Latency Benchmarks",
-    description: "Measuring origin server load reduction and edge node responsiveness for high quality video playback.",
-    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    thumbnail: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=600&auto=format&fit=crop&q=80",
-    views: 2100,
-    uploadDate: "5 days ago",
-    duration: "00:15",
-    isUserUploaded: false
-  }
-];
-
 function AppContent() {
-  const [videos, setVideos] = useState(INITIAL_DEMO_VIDEOS);
+  const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
@@ -54,7 +17,7 @@ function AppContent() {
   const [showCloudStats, setShowCloudStats] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  // Fetch uploaded videos from backend API
+  // Fetch real uploaded videos from backend MongoDB API
   const fetchVideos = async () => {
     try {
       setLoading(true);
@@ -62,17 +25,14 @@ function AppContent() {
       const res = await fetch("http://localhost:5000/api/videos");
       if (res.ok) {
         const backendVideos = await res.json();
-        // Combine user uploaded videos from backend with demo videos
-        const combined = [
-          ...backendVideos,
-          ...INITIAL_DEMO_VIDEOS
-        ];
-        setVideos(combined);
+        setVideos(backendVideos || []);
       } else {
-        console.warn("Backend API endpoint failed, falling back to local demo list.");
+        setError(true);
+        console.warn("Backend API endpoint failed.");
       }
     } catch (err) {
       console.error("Error fetching uploaded videos:", err);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -84,6 +44,18 @@ function AppContent() {
 
   const handleUploadSuccess = (newVideo) => {
     setVideos((prev) => [newVideo, ...prev]);
+  };
+
+  const handleDeleteVideo = (deletedId) => {
+    setVideos((prev) => prev.filter((v) => String(v.id) !== String(deletedId)));
+  };
+
+  const handleViewIncrement = (videoId, newViews) => {
+    setVideos((prev) =>
+      prev.map((v) =>
+        String(v.id) === String(videoId) ? { ...v, views: newViews } : v
+      )
+    );
   };
 
   return (
@@ -118,6 +90,7 @@ function AppContent() {
                   setActiveTab={setActiveTab}
                   searchQuery={searchFilter}
                   showCloudStats={showCloudStats}
+                  onDeleteVideo={handleDeleteVideo}
                 />
               }
             />
@@ -126,7 +99,9 @@ function AppContent() {
               element={
                 <Watch 
                   videos={videos} 
-                  showCloudStats={showCloudStats} 
+                  showCloudStats={showCloudStats}
+                  onDeleteVideo={handleDeleteVideo}
+                  onViewIncrement={handleViewIncrement}
                 />
               }
             />
