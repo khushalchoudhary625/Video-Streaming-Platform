@@ -6,6 +6,7 @@ const https = require("https");
 class CacheManager {
   constructor(config = {}) {
     this.edgeName = config.edgeName || "Delhi";
+    this.port = config.port || 4001;
     this.originUrl = (config.originUrl || "http://localhost:5000").replace(/\/+$/, "");
     this.cacheDir = path.resolve(config.cacheDir || "./cache");
     this.ttlSeconds = parseInt(config.ttlSeconds || 86400, 10);
@@ -24,8 +25,51 @@ class CacheManager {
       errors: 0
     };
 
+    // Real activity log (ring buffer of last 50 events)
+    this.recentActivity = [];
+
+    // Historical minute-bucketed logs for charts
+    this.timeSeriesBuckets = new Map();
+
     this.ensureCacheDir();
     this.cleanupOrphanedTempFiles();
+  }
+
+  logActivity(event) {
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      edge: this.edgeName,
+      ...event
+    };
+
+    this.recentActivity.unshift(entry);
+    if (this.recentActivity.length > 50) {
+      this.recentActivity.pop();
+    }
+
+    // Bucket into 1-minute intervals for time-series charts
+    const minuteKey = new Date().toISOString().substring(11, 16); // e.g. "14:25"
+    const bucket = this.timeSeriesBuckets.get(minuteKey) || {
+      time: minuteKey,
+      hits: 0,
+      misses: 0,
+      requests: 0,
+      bytesServed: 0
+    };
+
+    bucket.requests++;
+    if (event.type === "CACHE HIT") bucket.hits++;
+    if (event.type === "CACHE MISS") bucket.misses++;
+    if (event.bytes) bucket.bytesServed += event.bytes;
+
+    this.timeSeriesBuckets.set(minuteKey, bucket);
+
+    // Keep only last 15 minute buckets
+    if (this.timeSeriesBuckets.size > 15) {
+      const oldestKey = this.timeSeriesBuckets.keys().next().value;
+      this.timeSeriesBuckets.delete(oldestKey);
+    }
   }
 
   ensureCacheDir() {
@@ -155,6 +199,7 @@ class CacheManager {
     }
 
     const fetchPromise = (async () => {
+      const startTime = Date.now();
       this.stats.originFetches++;
       const originVideoUrl = `${this.originUrl}/videos/${encodeURIComponent(filename)}`;
       console.log(`[${this.edgeName}] [ORIGIN FETCH START] Requesting: ${originVideoUrl}`);
@@ -183,6 +228,27 @@ class CacheManager {
             }
           }
 
+          const durationMs = Date.now() - startTime;
+          if (result.success) {
+            this.logActivity({
+              type: "ORIGIN FETCH",
+              filename,
+              durationMs,
+              bytes: result.size,
+              statusCode: 200,
+              details: `Fetched ${(result.size / (1024 * 1024)).toFixed(2)} MB from origin and cached atomically`
+            });
+          } else {
+            this.stats.errors++;
+            this.logActivity({
+              type: "ERROR",
+              filename,
+              durationMs,
+              statusCode: result.statusCode || 502,
+              details: result.error || "Origin fetch failed"
+            });
+          }
+
           resolve(result);
         };
 
@@ -195,7 +261,6 @@ class CacheManager {
             }
           },
           (res) => {
-            // Handle redirect if any
             if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
               return safeCleanupAndResolve({
                 success: false,
@@ -313,6 +378,7 @@ class CacheManager {
    * Serve a video file with full HTTP Range request support
    */
   serveVideoWithRange(req, res, filename, cacheStatus = "HIT") {
+    const reqStartTime = Date.now();
     const filePath = this.getFilePath(filename);
 
     let stats;
@@ -320,6 +386,13 @@ class CacheManager {
       stats = fs.statSync(filePath);
     } catch (err) {
       console.error(`[${this.edgeName}] File read error for ${filename}:`, err.message);
+      this.logActivity({
+        type: "ERROR",
+        filename,
+        durationMs: Date.now() - reqStartTime,
+        statusCode: 404,
+        details: "File missing on disk"
+      });
       return res.status(404).json({ error: "Video file not found", edge: this.edgeName });
     }
 
@@ -362,6 +435,13 @@ class CacheManager {
       if (isNaN(start) || isNaN(end) || start < 0 || start >= fileSize || end < start) {
         console.warn(`[${this.edgeName}] [RANGE INVALID] Requested: "${range}" for size: ${fileSize}`);
         res.setHeader("Content-Range", `bytes */${fileSize}`);
+        this.logActivity({
+          type: "ERROR",
+          filename,
+          durationMs: Date.now() - reqStartTime,
+          statusCode: 416,
+          details: `Invalid range: ${range}`
+        });
         return res.status(416).send("Requested Range Not Satisfiable");
       }
 
@@ -376,6 +456,16 @@ class CacheManager {
       console.log(
         `[${this.edgeName}] [${cacheStatus}] [RANGE 206] ${filename} bytes ${start}-${end}/${fileSize} (${(chunkSize / 1024).toFixed(1)} KB)`
       );
+
+      this.logActivity({
+        type: `CACHE ${cacheStatus}`,
+        filename,
+        durationMs: Date.now() - reqStartTime,
+        bytes: chunkSize,
+        range: `bytes ${start}-${end}/${fileSize}`,
+        statusCode: 206,
+        details: `${cacheStatus === "HIT" ? "Served from edge disk cache" : "Cached from origin & served"} (${(chunkSize / 1024).toFixed(1)} KB)`
+      });
 
       res.status(206);
       res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
@@ -401,6 +491,16 @@ class CacheManager {
       console.log(
         `[${this.edgeName}] [${cacheStatus}] [FULL 200] ${filename} total ${(fileSize / (1024 * 1024)).toFixed(2)} MB`
       );
+
+      this.logActivity({
+        type: `CACHE ${cacheStatus}`,
+        filename,
+        durationMs: Date.now() - reqStartTime,
+        bytes: fileSize,
+        range: `full (${fileSize} bytes)`,
+        statusCode: 200,
+        details: `${cacheStatus === "HIT" ? "Served full stream from edge disk cache" : "Cached from origin & served full stream"}`
+      });
 
       res.status(200);
       res.setHeader("Content-Length", fileSize);
@@ -465,6 +565,12 @@ class CacheManager {
           fs.unlinkSync(item.path);
           totalSize -= item.size;
           console.log(`[${this.edgeName}] [LRU EVICTED] Removed oldest cached file: ${item.name} (${(item.size / (1024 * 1024)).toFixed(2)} MB)`);
+          this.logActivity({
+            type: "EVICTION",
+            filename: item.name,
+            bytes: item.size,
+            details: `LRU Eviction to keep cache under ${this.maxCacheSizeMB} MB`
+          });
         } catch (unlinkErr) {
           console.error(`[${this.edgeName}] Failed to evict file: ${item.name}`);
         }
@@ -475,7 +581,7 @@ class CacheManager {
   }
 
   /**
-   * Get telemetry stats for health check
+   * Get telemetry stats for health and metrics
    */
   getCacheInfo() {
     let cachedFilesCount = 0;
@@ -516,6 +622,42 @@ class CacheManager {
     };
   }
 
+  getMetrics() {
+    const cacheInfo = this.getCacheInfo();
+    const totalRequests = this.stats.hits + this.stats.misses;
+    const hitRatio = totalRequests > 0
+      ? `${((this.stats.hits / totalRequests) * 100).toFixed(1)}%`
+      : "0.0%";
+
+    return {
+      status: "healthy",
+      edge: this.edgeName,
+      port: this.port,
+      origin: this.originUrl,
+      uptimeSeconds: Math.round(process.uptime()),
+      cache: {
+        cachedFiles: cacheInfo.cachedFilesCount,
+        totalCacheSizeBytes: cacheInfo.totalSizeBytes,
+        totalCacheSizeMB: cacheInfo.totalSizeMB,
+        ttlSeconds: this.ttlSeconds,
+        maxCacheSizeMB: this.maxCacheSizeMB,
+        files: cacheInfo.files
+      },
+      metrics: {
+        totalRequests,
+        cacheHits: this.stats.hits,
+        cacheMisses: this.stats.misses,
+        originFetches: this.stats.originFetches,
+        bytesServed: this.stats.bytesServed,
+        bytesServedMB: (this.stats.bytesServed / (1024 * 1024)).toFixed(2),
+        hitRatio,
+        errors: this.stats.errors
+      },
+      recentActivity: this.recentActivity.slice(0, 30),
+      timeSeries: Array.from(this.timeSeriesBuckets.values())
+    };
+  }
+
   purgeCache() {
     let deleted = 0;
     try {
@@ -534,6 +676,12 @@ class CacheManager {
     } catch (e) {
       // ignore
     }
+
+    this.logActivity({
+      type: "PURGE",
+      details: `Purged ${deleted} files from cache`
+    });
+
     return deleted;
   }
 }

@@ -3,7 +3,13 @@ const multer = require("multer");
 const path = require("path");
 const router = express.Router();
 
-const { getVideos, uploadVideo, getCloudMetrics } = require("../controllers/videoController");
+const {
+    getVideos,
+    uploadVideo,
+    incrementViewCount,
+    deleteVideo,
+    getCloudMetrics
+} = require("../controllers/videoController");
 const { protect, adminOnly } = require("../middleware/authMiddleware");
 
 // Multer storage setup
@@ -24,13 +30,19 @@ const upload = multer({
     }
 });
 
-// Public: Get all videos
+// Public: Get all videos from MongoDB
 router.get("/", getVideos);
+
+// Public: Increment view count when video is watched
+router.post("/:id/view", incrementViewCount);
 
 // Admin Only: Upload a new video
 router.post("/upload", protect, adminOnly, upload.single("video"), uploadVideo);
 
-// Admin Only: Get Cloud & CDN metrics
+// Admin Only: Delete a video
+router.delete("/:id", protect, adminOnly, deleteVideo);
+
+// Admin Only: Get Real-time Cloud & CDN metrics
 router.get("/metrics", protect, adminOnly, getCloudMetrics);
 
 module.exports = router;

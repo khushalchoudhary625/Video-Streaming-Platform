@@ -15,6 +15,7 @@ const ORIGIN_TIMEOUT_MS = parseInt(process.env.ORIGIN_TIMEOUT_MS || 20000, 10);
 
 const cacheManager = new CacheManager({
   edgeName: EDGE_NAME,
+  port: PORT,
   originUrl: ORIGIN_URL,
   cacheDir: CACHE_DIR,
   ttlSeconds: CACHE_TTL_SECONDS,
@@ -48,6 +49,7 @@ app.get("/", (req, res) => {
     status: "online",
     endpoints: {
       health: "/health",
+      metrics: "/metrics",
       videoDelivery: "/videos/:filename",
       cacheInfo: "/cache"
     }
@@ -56,36 +58,21 @@ app.get("/", (req, res) => {
 
 // Health check endpoint
 app.get("/health", (req, res) => {
-  const cacheInfo = cacheManager.getCacheInfo();
-  const uptimeSeconds = Math.round(process.uptime());
-
+  const metrics = cacheManager.getMetrics();
   res.json({
     status: "healthy",
     edge: EDGE_NAME,
     port: PORT,
     origin: ORIGIN_URL,
-    uptimeSeconds,
-    cache: {
-      cachedFiles: cacheInfo.cachedFilesCount,
-      totalCacheSizeBytes: cacheInfo.totalSizeBytes,
-      totalCacheSizeMB: cacheInfo.totalSizeMB,
-      ttlSeconds: CACHE_TTL_SECONDS,
-      maxCacheSizeMB: MAX_CACHE_SIZE_MB
-    },
-    metrics: {
-      cacheHits: cacheManager.stats.hits,
-      cacheMisses: cacheManager.stats.misses,
-      originFetches: cacheManager.stats.originFetches,
-      bytesServedMB: (cacheManager.stats.bytesServed / (1024 * 1024)).toFixed(2),
-      hitRatio: cacheManager.stats.hits + cacheManager.stats.misses > 0
-        ? `${((cacheManager.stats.hits / (cacheManager.stats.hits + cacheManager.stats.misses)) * 100).toFixed(1)}%`
-        : "0.0%"
-    },
-    system: {
-      nodeVersion: process.version,
-      memoryUsageMB: (process.memoryUsage().rss / (1024 * 1024)).toFixed(2)
-    }
+    uptimeSeconds: metrics.uptimeSeconds,
+    cache: metrics.cache,
+    metrics: metrics.metrics
   });
+});
+
+// Real Metrics endpoint for CDN Dashboard
+app.get("/metrics", (req, res) => {
+  res.json(cacheManager.getMetrics());
 });
 
 // Video delivery endpoint (Compatible with origin /videos/:filename)
