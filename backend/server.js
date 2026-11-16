@@ -4,7 +4,6 @@ const cors = require("cors");
 const path = require("path");
 
 const connectDB = require("./config/db");
-const { seedDefaultUsers } = require("./controllers/authController");
 const videoRoutes = require("./routes/videoRoutes");
 const authRoutes = require("./routes/authRoutes");
 
@@ -14,12 +13,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Connect to Database & seed demo accounts
-connectDB().then((connected) => {
-    if (connected) {
-        seedDefaultUsers();
-    }
-});
+// Connect to Database
+connectDB();
 
 // Serve uploaded videos statically
 app.use(

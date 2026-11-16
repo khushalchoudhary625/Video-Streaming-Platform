@@ -137,44 +137,8 @@ const getMe = async (req, res) => {
     }
 };
 
-// Auto-seed default admin and regular user accounts if not present
-const seedDefaultUsers = async () => {
-    try {
-        const adminEmail = "admin@streamcloud.com";
-        const adminExists = await User.findOne({ email: adminEmail });
-        if (!adminExists) {
-            const salt = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash("admin123", salt);
-            await User.create({
-                name: "Platform Admin",
-                email: adminEmail,
-                password: hashedPassword,
-                role: "admin"
-            });
-            console.log("Seeded default Admin account: admin@streamcloud.com / admin123");
-        }
-
-        const userEmail = "user@streamcloud.com";
-        const userExists = await User.findOne({ email: userEmail });
-        if (!userExists) {
-            const salt = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash("user123", salt);
-            await User.create({
-                name: "Demo Student",
-                email: userEmail,
-                password: hashedPassword,
-                role: "user"
-            });
-            console.log("Seeded default User account: user@streamcloud.com / user123");
-        }
-    } catch (err) {
-        console.warn("User seeding notice:", err.message);
-    }
-};
-
 module.exports = {
     register,
     login,
-    getMe,
-    seedDefaultUsers
+    getMe
 };
