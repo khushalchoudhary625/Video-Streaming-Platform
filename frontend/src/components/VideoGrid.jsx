@@ -3,9 +3,11 @@ import VideoCard from "./VideoCard";
 import SkeletonGrid from "./Loading";
 import { Film, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
-export default function VideoGrid({ videos, loading, emptyMessage }) {
+export default function VideoGrid({ videos, loading, emptyMessage, onDeleteVideo }) {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
 
   if (loading) {
     return <SkeletonGrid count={8} />;
@@ -21,10 +23,12 @@ export default function VideoGrid({ videos, loading, emptyMessage }) {
         <p className="empty-desc">
           {emptyMessage || "Upload your first video and start building your video library."}
         </p>
-        <button className="btn-upload" onClick={() => navigate("/upload")}>
-          <Upload size={16} />
-          Upload Video
-        </button>
+        {isAdmin && (
+          <button className="btn-upload" onClick={() => navigate("/upload")}>
+            <Upload size={16} />
+            Upload Video
+          </button>
+        )}
       </div>
     );
   }
@@ -32,7 +36,11 @@ export default function VideoGrid({ videos, loading, emptyMessage }) {
   return (
     <div className="video-grid">
       {videos.map((video) => (
-        <VideoCard key={video.id} video={video} />
+        <VideoCard
+          key={video.id}
+          video={video}
+          onDelete={onDeleteVideo}
+        />
       ))}
     </div>
   );
