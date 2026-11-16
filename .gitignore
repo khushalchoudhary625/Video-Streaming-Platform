@@ -2,9 +2,12 @@
 **/node_modules/
 .env
 **/.env
-backend/uploads/
+backend/uploads/*
+!backend/uploads/.gitkeep
 backend/db/
-edge-delhi/cache/
-edge-mumbai/cache/
+edge-delhi/cache/*
+!edge-delhi/cache/.gitkeep
+edge-mumbai/cache/*
+!edge-mumbai/cache/.gitkeep
 dist/
 frontend/dist/

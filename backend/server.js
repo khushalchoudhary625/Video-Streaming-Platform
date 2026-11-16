@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
 
 const connectDB = require("./config/db");
 const videoRoutes = require("./routes/videoRoutes");
@@ -13,10 +14,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 // Serve uploaded videos statically
 app.use(
     "/videos",
-    express.static(path.join(__dirname, "uploads"))
+    express.static(uploadsDir)
 );
 
 // API Routes
@@ -31,6 +38,9 @@ app.get("/", (req, res) => {
 // Global Error Handler
 app.use((err, req, res, next) => {
     console.error("Unhandled Server Error:", err);
+    if (err.name === "MulterError") {
+        return res.status(400).json({ message: `Upload error: ${err.message}` });
+    }
     res.status(500).json({
         message: err.message || "An internal server error occurred."
     });
