@@ -11,7 +11,8 @@ export default function Home({
   activeTab, 
   setActiveTab, 
   searchQuery, 
-  showCloudStats 
+  showCloudStats,
+  onDeleteVideo
 }) {
   const { isAdmin } = useAuth();
 
@@ -88,6 +89,7 @@ export default function Home({
       <VideoGrid 
         videos={filteredVideos} 
         loading={loading} 
+        onDeleteVideo={onDeleteVideo}
         emptyMessage={
           searchQuery 
             ? `No videos matching "${searchQuery}".` 
