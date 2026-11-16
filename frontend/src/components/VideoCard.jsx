@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Play, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { ORIGIN_API_URL } from "../config/api";
 
 export default function VideoCard({ video, onDelete }) {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ export default function VideoCard({ video, onDelete }) {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/videos/${video.id}`, {
+      const res = await fetch(`${ORIGIN_API_URL}/api/videos/${video.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`

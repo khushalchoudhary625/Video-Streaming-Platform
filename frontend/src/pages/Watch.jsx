@@ -4,6 +4,7 @@ import VideoPlayer from "../components/VideoPlayer";
 import CloudDashboard from "../components/CloudDashboard";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { ORIGIN_API_URL } from "../config/api";
 
 export default function Watch({ videos = [], showCloudStats, onDeleteVideo, onViewIncrement }) {
   const { id } = useParams();
@@ -23,7 +24,7 @@ export default function Watch({ videos = [], showCloudStats, onDeleteVideo, onVi
     setViewTracked(true);
 
     try {
-      const res = await fetch(`http://localhost:5000/api/videos/${videoId}/view`, {
+      const res = await fetch(`${ORIGIN_API_URL}/api/videos/${videoId}/view`, {
         method: "POST"
       });
       if (res.ok) {

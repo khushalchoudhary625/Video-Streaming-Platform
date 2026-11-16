@@ -14,6 +14,7 @@ import {
   ArrowRight
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { ORIGIN_API_URL } from "../config/api";
 
 export default function CloudDashboard() {
   const { token, isAdmin } = useAuth();
@@ -73,7 +74,7 @@ export default function CloudDashboard() {
     if (isManual) setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/videos/metrics", {
+      const res = await fetch(`${ORIGIN_API_URL}/api/videos/metrics`, {
         headers: {
           Authorization: `Bearer ${token}`
         }

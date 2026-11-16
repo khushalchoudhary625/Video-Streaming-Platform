@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { UploadCloud, CheckCircle2, AlertCircle, FileVideo, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { ORIGIN_API_URL } from "../config/api";
 
 export default function UploadForm({ onUploadSuccess }) {
   const navigate = useNavigate();
@@ -63,7 +64,7 @@ export default function UploadForm({ onUploadSuccess }) {
     setMessage(null);
 
     try {
-      const response = await fetch("http://localhost:5000/api/videos/upload", {
+      const response = await fetch(`${ORIGIN_API_URL}/api/videos/upload`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`

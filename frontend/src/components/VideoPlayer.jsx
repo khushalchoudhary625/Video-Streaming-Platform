@@ -3,6 +3,7 @@ import { ThumbsUp, Share2, Server, Download, Trash2, Radio } from "lucide-react"
 import VideoCard from "./VideoCard";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { ORIGIN_API_URL, DELHI_EDGE_URL, MUMBAI_EDGE_URL } from "../config/api";
 
 export default function VideoPlayer({ video, recommendedVideos = [], onPlay, onDeleteVideo }) {
   const { isAdmin, token } = useAuth();
@@ -19,13 +20,13 @@ export default function VideoPlayer({ video, recommendedVideos = [], onPlay, onD
   let videoSrc = "";
   let nodeLabel = "";
   if (selectedNode === "delhi") {
-    videoSrc = `http://localhost:4001/videos/${filename}`;
+    videoSrc = `${DELHI_EDGE_URL}/videos/${filename}`;
     nodeLabel = "Delhi Edge Node (Port 4001)";
   } else if (selectedNode === "mumbai") {
-    videoSrc = `http://localhost:4002/videos/${filename}`;
+    videoSrc = `${MUMBAI_EDGE_URL}/videos/${filename}`;
     nodeLabel = "Mumbai Edge Node (Port 4002)";
   } else {
-    videoSrc = `http://localhost:5000/videos/${filename}`;
+    videoSrc = `${ORIGIN_API_URL}/videos/${filename}`;
     nodeLabel = "Origin Server (Port 5000)";
   }
 
@@ -35,7 +36,7 @@ export default function VideoPlayer({ video, recommendedVideos = [], onPlay, onD
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/videos/${video.id}`, {
+      const res = await fetch(`${ORIGIN_API_URL}/api/videos/${video.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`

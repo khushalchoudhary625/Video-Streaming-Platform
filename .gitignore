@@ -3,5 +3,8 @@
 .env
 **/.env
 backend/uploads/
+backend/db/
 edge-delhi/cache/
 edge-mumbai/cache/
+dist/
+frontend/dist/

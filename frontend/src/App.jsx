@@ -7,6 +7,7 @@ import Watch from "./pages/Watch";
 import UploadPage from "./pages/Upload";
 import AuthModal from "./components/AuthModal";
 import { AuthProvider } from "./context/AuthContext";
+import { ORIGIN_API_URL } from "./config/api";
 
 function AppContent() {
   const [videos, setVideos] = useState([]);
@@ -22,7 +23,7 @@ function AppContent() {
     try {
       setLoading(true);
       setError(false);
-      const res = await fetch("http://localhost:5000/api/videos");
+      const res = await fetch(`${ORIGIN_API_URL}/api/videos`);
       if (res.ok) {
         const backendVideos = await res.json();
         setVideos(backendVideos || []);
