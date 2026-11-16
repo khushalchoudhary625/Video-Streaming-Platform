@@ -42,7 +42,9 @@ const register = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         // Assign role ("admin" or default "user")
-        const assignedRole = role === "admin" ? "admin" : "user";
+        // const assignedRole = role === "admin" ? "admin" : "user";
+        const assignedRole = role === "admin" ? "user" : "user";
+
 
         // Create user
         const user = await User.create({
