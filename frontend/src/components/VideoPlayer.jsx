@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { ThumbsUp, Share2, Server, Download, Trash2, Radio } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { ThumbsUp, Share2, Server, Download, Trash2, Radio, Zap, Globe2 } from "lucide-react";
 import VideoCard from "./VideoCard";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -9,8 +9,80 @@ export default function VideoPlayer({ video, recommendedVideos = [], onPlay, onD
   const { isAdmin, token } = useAuth();
   const navigate = useNavigate();
 
-  // Edge server selector: Delhi (4001), Mumbai (4002), Origin (5000)
+  // Edge server selector and Geo-routing state
+  const [routingMode, setRoutingMode] = useState("auto"); // "auto" | "manual"
   const [selectedNode, setSelectedNode] = useState("delhi"); // "delhi" | "mumbai" | "origin"
+  const [latencies, setLatencies] = useState({ delhi: null, mumbai: null });
+  const [probing, setProbing] = useState(false);
+  const [routingStatus, setRoutingStatus] = useState("Probing nearest CDN edge node...");
+
+  // Probe latency to an edge node using its /health endpoint
+  const pingNode = async (url) => {
+    const start = performance.now();
+    try {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 2500);
+      const res = await fetch(`${url}/health`, {
+        method: "GET",
+        cache: "no-store",
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      if (!res.ok) return Infinity;
+      return Math.round(performance.now() - start);
+    } catch {
+      return Infinity;
+    }
+  };
+
+  // Automatically detect the lowest-latency edge server (Geo-Routing Simulation)
+  const detectNearestEdge = useCallback(async () => {
+    setProbing(true);
+    setRoutingStatus("Measuring latency to global CDN edge servers...");
+
+    const [delhiMs, mumbaiMs] = await Promise.all([
+      pingNode(DELHI_EDGE_URL),
+      pingNode(MUMBAI_EDGE_URL)
+    ]);
+
+    setLatencies({ delhi: delhiMs, mumbai: mumbaiMs });
+    setProbing(false);
+
+    // Failover if both nodes are unreachable
+    if (delhiMs === Infinity && mumbaiMs === Infinity) {
+      setSelectedNode("origin");
+      setRoutingStatus("Edge nodes unreachable. Automatically failed over to Direct Origin.");
+      return;
+    }
+
+    if (delhiMs === Infinity) {
+      setSelectedNode("mumbai");
+      setRoutingStatus(`Delhi node unreachable. Auto-routed to Mumbai Edge (${mumbaiMs}ms).`);
+      return;
+    }
+
+    if (mumbaiMs === Infinity) {
+      setSelectedNode("delhi");
+      setRoutingStatus(`Mumbai node unreachable. Auto-routed to Delhi Edge (${delhiMs}ms).`);
+      return;
+    }
+
+    // Auto-select node with lowest latency (nearest geographical PoP)
+    if (delhiMs <= mumbaiMs) {
+      setSelectedNode("delhi");
+      setRoutingStatus(`Smart Geo-Routing: Auto-routed to Delhi Edge Node (Lowest Latency: ${delhiMs}ms vs Mumbai ${mumbaiMs}ms)`);
+    } else {
+      setSelectedNode("mumbai");
+      setRoutingStatus(`Smart Geo-Routing: Auto-routed to Mumbai Edge Node (Lowest Latency: ${mumbaiMs}ms vs Delhi ${delhiMs}ms)`);
+    }
+  }, []);
+
+  // Run auto geo-routing when video loads or auto mode is re-triggered
+  useEffect(() => {
+    if (routingMode === "auto") {
+      detectNearestEdge();
+    }
+  }, [video?.id, routingMode, detectNearestEdge]);
 
   if (!video) return null;
 
@@ -21,10 +93,10 @@ export default function VideoPlayer({ video, recommendedVideos = [], onPlay, onD
   let nodeLabel = "";
   if (selectedNode === "delhi") {
     videoSrc = `${DELHI_EDGE_URL}/videos/${filename}`;
-    nodeLabel = "Delhi Edge Node (Port 4001)";
+    nodeLabel = `Delhi Edge Node${latencies.delhi !== null && latencies.delhi !== Infinity ? ` (${latencies.delhi}ms)` : ""}`;
   } else if (selectedNode === "mumbai") {
     videoSrc = `${MUMBAI_EDGE_URL}/videos/${filename}`;
-    nodeLabel = "Mumbai Edge Node (Port 4002)";
+    nodeLabel = `Mumbai Edge Node${latencies.mumbai !== null && latencies.mumbai !== Infinity ? ` (${latencies.mumbai}ms)` : ""}`;
   } else {
     videoSrc = `${ORIGIN_API_URL}/videos/${filename}`;
     nodeLabel = "Origin Server (Port 5000)";
@@ -61,7 +133,7 @@ export default function VideoPlayer({ video, recommendedVideos = [], onPlay, onD
   return (
     <div className="watch-container">
       <div className="main-video-section">
-        {/* Stream Source Selector for College Demo */}
+        {/* Stream Source Selector for College Demo with Smart Geo-Routing */}
         <div className="stream-source-selector">
           <div className="stream-source-label">
             <Radio size={16} color="var(--primary-accent)" />
@@ -69,24 +141,66 @@ export default function VideoPlayer({ video, recommendedVideos = [], onPlay, onD
           </div>
           <div className="stream-source-buttons">
             <button
-              className={`node-pill ${selectedNode === "delhi" ? "active" : ""}`}
-              onClick={() => setSelectedNode("delhi")}
+              className={`node-pill ${routingMode === "auto" ? "active" : ""}`}
+              onClick={() => {
+                setRoutingMode("auto");
+                detectNearestEdge();
+              }}
+              style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}
+              title="Automatically probe latency to nearest CDN edge server"
             >
-              Delhi Edge (4001)
+              <Zap size={13} color={routingMode === "auto" ? "#facc15" : "currentColor"} />
+              <span>Auto (Smart Geo-Routing)</span>
+              {probing && <span style={{ fontSize: "10px", marginLeft: "2px" }}>⏳</span>}
             </button>
             <button
-              className={`node-pill ${selectedNode === "mumbai" ? "active" : ""}`}
-              onClick={() => setSelectedNode("mumbai")}
+              className={`node-pill ${routingMode === "manual" && selectedNode === "delhi" ? "active" : ""}`}
+              onClick={() => {
+                setRoutingMode("manual");
+                setSelectedNode("delhi");
+                setRoutingStatus("Manual Override: Streaming from Delhi Edge Node");
+              }}
             >
-              Mumbai Edge (4002)
+              Delhi Edge {latencies.delhi !== null && latencies.delhi !== Infinity ? `(${latencies.delhi}ms)` : ""}
             </button>
             <button
-              className={`node-pill ${selectedNode === "origin" ? "active" : ""}`}
-              onClick={() => setSelectedNode("origin")}
+              className={`node-pill ${routingMode === "manual" && selectedNode === "mumbai" ? "active" : ""}`}
+              onClick={() => {
+                setRoutingMode("manual");
+                setSelectedNode("mumbai");
+                setRoutingStatus("Manual Override: Streaming from Mumbai Edge Node");
+              }}
             >
-              Direct Origin (5000)
+              Mumbai Edge {latencies.mumbai !== null && latencies.mumbai !== Infinity ? `(${latencies.mumbai}ms)` : ""}
+            </button>
+            <button
+              className={`node-pill ${routingMode === "manual" && selectedNode === "origin" ? "active" : ""}`}
+              onClick={() => {
+                setRoutingMode("manual");
+                setSelectedNode("origin");
+                setRoutingStatus("Manual Override: Streaming directly from Origin Server");
+              }}
+            >
+              Direct Origin
             </button>
           </div>
+
+          {/* Live Geo-Routing Status Feedback */}
+          {routingStatus && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              fontSize: "0.8rem",
+              color: routingMode === "auto" ? "#16a34a" : "var(--text-secondary)",
+              marginTop: "4px",
+              width: "100%",
+              fontWeight: 500
+            }}>
+              <Globe2 size={14} color={routingMode === "auto" ? "#16a34a" : "var(--text-secondary)"} />
+              <span>{routingStatus}</span>
+            </div>
+          )}
         </div>
 
         <div className="video-player-wrapper">
