@@ -17,7 +17,7 @@ export const DELHI_EDGE_URL = import.meta.env.VITE_DELHI_URL
   ? import.meta.env.VITE_DELHI_URL.replace(/\/+$/, "")
   : (isLocalhost ? "http://localhost:4001" : RENDER_BACKEND);
 
-// Mumbai Edge Node (Falls back to Render origin if not separately deployed)
+// Mumbai Edge Node (Deployed on Render, falls back to 4002 on localhost)
 export const MUMBAI_EDGE_URL = import.meta.env.VITE_MUMBAI_URL
   ? import.meta.env.VITE_MUMBAI_URL.replace(/\/+$/, "")
-  : (isLocalhost ? "http://localhost:4002" : RENDER_BACKEND);
+  : (isLocalhost ? "http://localhost:4002" : "https://video-streaming-platform-1-l7z7.onrender.com");

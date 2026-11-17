@@ -3,40 +3,27 @@ const path = require("path");
 const http = require("http");
 const Video = require("../models/Video");
 
-// Helper to safely fetch metrics from an edge server
-const fetchEdgeMetrics = (url) => {
-    return new Promise((resolve) => {
-        const parsed = new URL(url);
-        const req = http.get(
-            {
-                hostname: parsed.hostname,
-                port: parsed.port,
-                path: parsed.pathname,
-                timeout: 1500
-            },
-            (res) => {
-                let data = "";
-                res.on("data", (chunk) => (data += chunk));
-                res.on("end", () => {
-                    try {
-                        const json = JSON.parse(data);
-                        resolve({ online: true, ...json });
-                    } catch (e) {
-                        resolve({ online: false, error: "Invalid JSON response" });
-                    }
-                });
-            }
-        );
+// Helper to safely fetch metrics from an edge server (supports both HTTP and HTTPS)
+const fetchEdgeMetrics = async (url) => {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-        req.on("timeout", () => {
-            req.destroy();
-            resolve({ online: false, error: "Connection timed out" });
+        const res = await fetch(url, {
+            signal: controller.signal,
+            headers: { "Accept": "application/json" }
         });
+        clearTimeout(timeoutId);
 
-        req.on("error", (err) => {
-            resolve({ online: false, error: err.message });
-        });
-    });
+        if (!res.ok) {
+            return { online: false, error: `HTTP ${res.status}` };
+        }
+
+        const json = await res.json();
+        return { online: true, ...json };
+    } catch (err) {
+        return { online: false, error: err.message };
+    }
 };
 
 // @desc    Get all videos from MongoDB
@@ -254,10 +241,16 @@ const getCloudMetrics = async (req, res) => {
         const totalSizeBytes = videos.reduce((acc, curr) => acc + (curr.size || 0), 0);
         const storageUsedMB = (totalSizeBytes / (1024 * 1024)).toFixed(2);
 
-        // Fetch live metrics from Delhi (4001) and Mumbai (4002) in parallel
+        // Determine active Edge Node URLs (supports cloud deployment and local testing)
+        const isProduction = process.env.NODE_ENV === "production" || !process.env.NODE_ENV;
+        const defaultMumbai = isProduction ? "https://video-streaming-platform-1-l7z7.onrender.com" : "http://localhost:4002";
+        const mumbaiBaseUrl = (process.env.MUMBAI_EDGE_URL || defaultMumbai).replace(/\/+$/, "");
+        const delhiBaseUrl = (process.env.DELHI_EDGE_URL || "http://localhost:4001").replace(/\/+$/, "");
+
+        // Fetch live metrics from Delhi and Mumbai in parallel
         const [delhiMetrics, mumbaiMetrics] = await Promise.all([
-            fetchEdgeMetrics("http://localhost:4001/metrics"),
-            fetchEdgeMetrics("http://localhost:4002/metrics")
+            fetchEdgeMetrics(`${delhiBaseUrl}/metrics`),
+            fetchEdgeMetrics(`${mumbaiBaseUrl}/metrics`)
         ]);
 
         // Aggregate actual live edge metrics
@@ -307,7 +300,8 @@ const getCloudMetrics = async (req, res) => {
             },
             delhi: {
                 edge: "Delhi",
-                port: 4001,
+                port: delhiMetrics.port || 4001,
+                url: delhiBaseUrl,
                 online: delhiMetrics.online,
                 totalRequests: delhiHits + delhiMisses,
                 cacheHits: delhiHits,
@@ -322,7 +316,8 @@ const getCloudMetrics = async (req, res) => {
             },
             mumbai: {
                 edge: "Mumbai",
-                port: 4002,
+                port: mumbaiMetrics.port || 10000,
+                url: mumbaiBaseUrl,
                 online: mumbaiMetrics.online,
                 totalRequests: mumbaiHits + mumbaiMisses,
                 cacheHits: mumbaiHits,

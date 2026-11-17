@@ -273,7 +273,7 @@ export default function CloudDashboard() {
           <div className="edge-node-header">
             <div className="edge-node-title">
               <Radio size={16} color={delhi.online ? "#10b981" : "#ef4444"} />
-              <span>Delhi Edge Server (Port 4001)</span>
+              <span>Delhi Edge Server {delhi.port ? `(Port ${delhi.port})` : ""}</span>
             </div>
             <span className={`edge-status-pill ${delhi.online ? "online" : "offline"}`}>
               <span className="status-dot-pulse"></span>
@@ -326,7 +326,7 @@ export default function CloudDashboard() {
           <div className="edge-node-header">
             <div className="edge-node-title">
               <Radio size={16} color={mumbai.online ? "#10b981" : "#ef4444"} />
-              <span>Mumbai Edge Server (Port 4002)</span>
+              <span>Mumbai Edge Server {mumbai.port ? `(Port ${mumbai.port})` : ""}</span>
             </div>
             <span className={`edge-status-pill ${mumbai.online ? "online" : "offline"}`}>
               <span className="status-dot-pulse"></span>
