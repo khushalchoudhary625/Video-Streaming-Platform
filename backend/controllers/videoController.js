@@ -2,7 +2,6 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const Video = require("../models/Video");
-const { uploadToGridFS, deleteFromGridFS } = require("../config/gridfs");
 
 // Helper to safely fetch metrics from an edge server
 const fetchEdgeMetrics = (url) => {
@@ -130,7 +129,7 @@ const uploadVideo = async (req, res) => {
         const description = req.body.description ? req.body.description.trim() : "CDN Edge Streamable Video";
         const videoUrl = `/videos/${req.file.filename}`;
 
-        // Save to MongoDB Metadata
+        // Save to MongoDB
         const savedVideo = await Video.create({
             title,
             description,
@@ -142,9 +141,6 @@ const uploadVideo = async (req, res) => {
             uploader: req.user ? req.user._id : null,
             uploaderName: req.user ? req.user.name : "Admin"
         });
-
-        // Store video binary in MongoDB GridFS for permanent storage across container restarts
-        await uploadToGridFS(req.file.path, req.file.filename, req.file.mimetype || "video/mp4");
 
         res.status(201).json({
             message: "Video uploaded successfully to CDN origin storage",
@@ -223,7 +219,7 @@ const deleteVideo = async (req, res) => {
             return res.status(404).json({ message: "Video not found" });
         }
 
-        // Delete physical file from uploads folder if present
+        // Delete physical file from uploads folder
         const uploadsDir = path.join(__dirname, "../uploads");
         const filePath = path.join(uploadsDir, video.filename);
         if (fs.existsSync(filePath)) {
@@ -234,10 +230,7 @@ const deleteVideo = async (req, res) => {
             }
         }
 
-        // Delete from MongoDB GridFS
-        await deleteFromGridFS(video.filename);
-
-        // Delete from MongoDB Metadata
+        // Delete from MongoDB
         await Video.findByIdAndDelete(video._id);
 
         res.json({
