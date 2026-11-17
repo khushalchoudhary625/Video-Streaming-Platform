@@ -12,10 +12,10 @@ export const ORIGIN_API_URL = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace(/\/+$/, "")
   : (isLocalhost ? "http://localhost:5000" : RENDER_BACKEND);
 
-// Delhi Edge Node (Falls back to Render origin if not separately deployed)
+// Delhi Edge Node (Deployed on Render, falls back to 4001 on localhost)
 export const DELHI_EDGE_URL = import.meta.env.VITE_DELHI_URL
   ? import.meta.env.VITE_DELHI_URL.replace(/\/+$/, "")
-  : (isLocalhost ? "http://localhost:4001" : RENDER_BACKEND);
+  : (isLocalhost ? "http://localhost:4001" : "https://video-streaming-platform-2-29ky.onrender.com");
 
 // Mumbai Edge Node (Deployed on Render, falls back to 4002 on localhost)
 export const MUMBAI_EDGE_URL = import.meta.env.VITE_MUMBAI_URL

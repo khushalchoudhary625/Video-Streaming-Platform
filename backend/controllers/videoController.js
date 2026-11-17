@@ -243,9 +243,10 @@ const getCloudMetrics = async (req, res) => {
 
         // Determine active Edge Node URLs (supports cloud deployment and local testing)
         const isProduction = process.env.NODE_ENV === "production" || !process.env.NODE_ENV;
+        const defaultDelhi = isProduction ? "https://video-streaming-platform-2-29ky.onrender.com" : "http://localhost:4001";
         const defaultMumbai = isProduction ? "https://video-streaming-platform-1-l7z7.onrender.com" : "http://localhost:4002";
+        const delhiBaseUrl = (process.env.DELHI_EDGE_URL || defaultDelhi).replace(/\/+$/, "");
         const mumbaiBaseUrl = (process.env.MUMBAI_EDGE_URL || defaultMumbai).replace(/\/+$/, "");
-        const delhiBaseUrl = (process.env.DELHI_EDGE_URL || "http://localhost:4001").replace(/\/+$/, "");
 
         // Fetch live metrics from Delhi and Mumbai in parallel
         const [delhiMetrics, mumbaiMetrics] = await Promise.all([
