@@ -5,6 +5,7 @@ const path = require("path");
 const fs = require("fs");
 
 const connectDB = require("./config/db");
+const { streamFromGridFS, getGridFSBucket } = require("./config/gridfs");
 const videoRoutes = require("./routes/videoRoutes");
 const authRoutes = require("./routes/authRoutes");
 
@@ -20,19 +21,20 @@ if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Robust video streaming endpoint with HTTP Range Requests and Render fallback
-app.get("/videos/:filename", (req, res) => {
+// Robust video streaming endpoint with HTTP Range Requests and MongoDB GridFS cloud fallback
+app.get("/videos/:filename", async (req, res) => {
     const filename = path.basename(req.params.filename);
     const filePath = path.join(uploadsDir, filename);
 
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges");
+    res.setHeader("Accept-Ranges", "bytes");
+
+    // 1. Check if the physical file exists on local container disk
     if (fs.existsSync(filePath)) {
         const stat = fs.statSync(filePath);
         const fileSize = stat.size;
         const range = req.headers.range;
-
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges");
-        res.setHeader("Accept-Ranges", "bytes");
 
         if (range) {
             const parts = range.replace(/bytes=/, "").split("-");
@@ -52,22 +54,43 @@ app.get("/videos/:filename", (req, res) => {
                 "Content-Length": chunksize,
                 "Content-Type": "video/mp4"
             });
-            fileStream.pipe(res);
+            return fileStream.pipe(res);
         } else {
             res.writeHead(200, {
                 "Content-Length": fileSize,
                 "Content-Type": "video/mp4"
             });
-            fs.createReadStream(filePath).pipe(res);
+            return fs.createReadStream(filePath).pipe(res);
         }
-    } else {
-        // When Render free tier spins down or restarts, ephemeral disk storage is wiped.
-        // Redirect to high-definition cloud CDN demo stream so playback never crashes with 404!
-        console.warn(`[VIDEO STREAM] File "${filename}" not on server disk. Redirecting to reliable cloud video stream.`);
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("X-StreamCloud-Fallback", "true");
-        return res.redirect("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4");
     }
+
+    // 2. Physical file not on local disk (e.g. Render free tier container restarted after 15 min sleep)
+    // Stream directly from permanent MongoDB Atlas GridFS storage!
+    const streamedFromGridFS = await streamFromGridFS(filename, req, res);
+    if (streamedFromGridFS) {
+        console.log(`[STREAMING] Video "${filename}" streamed directly from MongoDB GridFS cloud storage`);
+
+        // Asynchronously cache file to local container disk for instant subsequent seeks
+        try {
+            const bucket = getGridFSBucket();
+            if (bucket && !fs.existsSync(filePath)) {
+                const downloadStream = bucket.openDownloadStreamByName(filename);
+                const writeStream = fs.createWriteStream(filePath);
+                downloadStream.pipe(writeStream).on("error", () => {});
+            }
+        } catch (cacheErr) {
+            // Non-critical local cache error
+        }
+        return;
+    }
+
+    // 3. Not found on disk or in MongoDB GridFS
+    console.warn(`[VIDEO STREAM] File "${filename}" not found in disk storage or MongoDB GridFS.`);
+    return res.status(404).json({
+        error: "Video file not found",
+        filename: filename,
+        message: "This video was uploaded to temporary server storage before persistent cloud GridFS storage was enabled. Please delete this video and re-upload it to store it permanently."
+    });
 });
 
 // Serve uploaded videos statically as secondary handler

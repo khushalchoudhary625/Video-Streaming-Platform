@@ -123,12 +123,12 @@ export default function VideoPlayer({ video, recommendedVideos = [], onPlay, onD
               <h3 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "8px" }}>
                 Unable to Stream from {nodeLabel}
               </h3>
-              <p style={{ color: "#94a3b8", maxWidth: "460px", fontSize: "0.9rem", lineHeight: 1.5, marginBottom: "20px" }}>
+              <p style={{ color: "#94a3b8", maxWidth: "480px", fontSize: "0.9rem", lineHeight: 1.5, marginBottom: "20px" }}>
                 {selectedNode !== "origin" 
                   ? "This edge server may be offline or unreachable. Try switching to Direct Origin Server."
-                  : "The stream endpoint is currently unreachable. Please check your backend connection."}
+                  : "Video file was not found on the server. If this video was uploaded before permanent cloud storage was enabled, please delete and re-upload it."}
               </p>
-              <div style={{ display: "flex", gap: "12px" }}>
+              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
                 {selectedNode !== "origin" && (
                   <button 
                     className="btn-upload" 
@@ -136,6 +136,16 @@ export default function VideoPlayer({ video, recommendedVideos = [], onPlay, onD
                     style={{ fontSize: "0.9rem", padding: "8px 16px" }}
                   >
                     Switch to Direct Origin
+                  </button>
+                )}
+                {isAdmin && (
+                  <button 
+                    className="btn-action" 
+                    onClick={handleDelete}
+                    style={{ fontSize: "0.9rem", padding: "8px 16px", color: "#f87171", borderColor: "#f87171" }}
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete & Re-upload</span>
                   </button>
                 )}
                 <button 
