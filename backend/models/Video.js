@@ -18,6 +18,14 @@ const videoSchema = new mongoose.Schema({
         type: String,
         required: [true, "Video URL is required"]
     },
+    cloudinaryUrl: {
+        type: String,
+        default: ""
+    },
+    cloudinaryId: {
+        type: String,
+        default: ""
+    },
     size: {
         type: Number,
         default: 0

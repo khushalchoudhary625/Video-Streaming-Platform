@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const Video = require("../models/Video");
+const { cloudinary, isCloudinaryConfigured } = require("../config/cloudinary");
 
 // Helper to safely fetch metrics from an edge server (supports both HTTP and HTTPS)
 const fetchEdgeMetrics = async (url) => {
@@ -116,12 +117,47 @@ const uploadVideo = async (req, res) => {
         const description = req.body.description ? req.body.description.trim() : "CDN Edge Streamable Video";
         const videoUrl = `/videos/${req.file.filename}`;
 
+        let cloudinaryUrl = "";
+        let cloudinaryId = "";
+
+        // If Cloudinary is configured, upload for permanent persistence across Render reboots
+        if (isCloudinaryConfigured()) {
+            console.log(`[Cloudinary] Uploading ${req.file.filename} to Cloudinary permanent storage...`);
+            try {
+                const uploadResult = await new Promise((resolve, reject) => {
+                    cloudinary.uploader.upload_large(
+                        req.file.path,
+                        {
+                            resource_type: "video",
+                            folder: "video_streaming_platform",
+                            public_id: path.parse(req.file.filename).name,
+                            chunk_size: 6000000 // 6MB chunks for robust uploads
+                        },
+                        (error, result) => {
+                            if (error) return reject(error);
+                            resolve(result);
+                        }
+                    );
+                });
+
+                cloudinaryUrl = uploadResult.secure_url || uploadResult.url;
+                cloudinaryId = uploadResult.public_id;
+                console.log(`[Cloudinary] Permanent upload succeeded! Cloud URL: ${cloudinaryUrl}`);
+            } catch (cloudErr) {
+                console.error("[Cloudinary] Upload failed, falling back to local storage:", cloudErr.message);
+            }
+        } else {
+            console.log("[Cloudinary] Not configured. Video stored only on local disk.");
+        }
+
         // Save to MongoDB
         const savedVideo = await Video.create({
             title,
             description,
             filename: req.file.filename,
             url: videoUrl,
+            cloudinaryUrl,
+            cloudinaryId,
             size: req.file.size,
             views: 0,
             duration: req.body.duration || "04:30",
@@ -214,6 +250,16 @@ const deleteVideo = async (req, res) => {
                 fs.unlinkSync(filePath);
             } catch (unlinkErr) {
                 console.warn("Could not delete physical video file:", unlinkErr.message);
+            }
+        }
+
+        // Delete from Cloudinary if configured
+        if (video.cloudinaryId && isCloudinaryConfigured()) {
+            try {
+                await cloudinary.uploader.destroy(video.cloudinaryId, { resource_type: "video" });
+                console.log(`[Cloudinary] Deleted ${video.cloudinaryId} from Cloudinary`);
+            } catch (destroyErr) {
+                console.warn("[Cloudinary] Could not delete from Cloudinary:", destroyErr.message);
             }
         }
 
