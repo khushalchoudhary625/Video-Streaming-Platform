@@ -934,6 +934,12 @@ textarea.form-input {
   color: #991b1b;
 }
 
+.alert-message.warning {
+  background-color: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #f59e0b;
+}
+
 /* Cloud Performance Dashboard Drawer/Modal */
 .cloud-dashboard-card {
   background-color: var(--bg-card);

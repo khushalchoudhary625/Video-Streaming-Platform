@@ -119,32 +119,37 @@ const uploadVideo = async (req, res) => {
 
         let cloudinaryUrl = "";
         let cloudinaryId = "";
+        const MAX_CLOUDINARY_SIZE = 100 * 1024 * 1024; // 100 MB Cloudinary Free Plan limit
 
         // If Cloudinary is configured, upload for permanent persistence across Render reboots
         if (isCloudinaryConfigured()) {
-            console.log(`[Cloudinary] Uploading ${req.file.filename} to Cloudinary permanent storage...`);
-            try {
-                const uploadResult = await new Promise((resolve, reject) => {
-                    cloudinary.uploader.upload_large(
-                        req.file.path,
-                        {
-                            resource_type: "video",
-                            folder: "video_streaming_platform",
-                            public_id: path.parse(req.file.filename).name,
-                            chunk_size: 6000000 // 6MB chunks for robust uploads
-                        },
-                        (error, result) => {
-                            if (error) return reject(error);
-                            resolve(result);
-                        }
-                    );
-                });
+            if (req.file.size > MAX_CLOUDINARY_SIZE) {
+                console.warn(`[Cloudinary] Video size (${(req.file.size / (1024 * 1024)).toFixed(1)} MB) exceeds Cloudinary Free tier 100 MB limit. Stored on Origin local disk.`);
+            } else {
+                console.log(`[Cloudinary] Uploading ${req.file.filename} (${(req.file.size / (1024 * 1024)).toFixed(1)} MB) to Cloudinary permanent storage...`);
+                try {
+                    const uploadResult = await new Promise((resolve, reject) => {
+                        cloudinary.uploader.upload_large(
+                            req.file.path,
+                            {
+                                resource_type: "video",
+                                folder: "video_streaming_platform",
+                                public_id: path.parse(req.file.filename).name,
+                                chunk_size: 6000000 // 6MB chunks for robust uploads
+                            },
+                            (error, result) => {
+                                if (error) return reject(error);
+                                resolve(result);
+                            }
+                        );
+                    });
 
-                cloudinaryUrl = uploadResult.secure_url || uploadResult.url;
-                cloudinaryId = uploadResult.public_id;
-                console.log(`[Cloudinary] Permanent upload succeeded! Cloud URL: ${cloudinaryUrl}`);
-            } catch (cloudErr) {
-                console.error("[Cloudinary] Upload failed, falling back to local storage:", cloudErr.message);
+                    cloudinaryUrl = uploadResult.secure_url || uploadResult.url;
+                    cloudinaryId = uploadResult.public_id;
+                    console.log(`[Cloudinary] Permanent upload succeeded! Cloud URL: ${cloudinaryUrl}`);
+                } catch (cloudErr) {
+                    console.error("[Cloudinary] Upload failed, falling back to local storage:", cloudErr.message);
+                }
             }
         } else {
             console.log("[Cloudinary] Not configured. Video stored only on local disk.");
@@ -165,10 +170,16 @@ const uploadVideo = async (req, res) => {
             uploaderName: req.user ? req.user.name : "Admin"
         });
 
+        const isPermanent = Boolean(cloudinaryUrl);
         res.status(201).json({
-            message: "Video uploaded successfully to CDN origin storage",
+            message: isPermanent
+                ? "Video uploaded successfully and stored permanently in Cloud storage"
+                : (req.file.size > MAX_CLOUDINARY_SIZE
+                    ? "Video uploaded to local storage. (Files over 100MB exceed Cloudinary Free Tier limit and stay on ephemeral storage)"
+                    : "Video uploaded successfully to CDN origin storage"),
             filename: req.file.filename,
             url: videoUrl,
+            isPermanent,
             video: {
                 id: savedVideo._id.toString(),
                 title: savedVideo.title,
@@ -201,13 +212,13 @@ const incrementViewCount = async (req, res) => {
             video = await Video.findByIdAndUpdate(
                 id,
                 { $inc: { views: 1 } },
-                { new: true }
+                { returnDocument: 'after' }
             );
         } else {
             video = await Video.findOneAndUpdate(
                 { filename: id },
                 { $inc: { views: 1 } },
-                { new: true }
+                { returnDocument: 'after' }
             );
         }
 

@@ -23,7 +23,14 @@ export default function UploadForm({ onUploadSuccess }) {
         const nameWithoutExt = selected.name.replace(/\.[^/.]+$/, "");
         setTitle(nameWithoutExt);
       }
-      setMessage(null);
+      if (selected.size > 100 * 1024 * 1024) {
+        setMessage({
+          type: "warning",
+          text: `Selected file is ${(selected.size / (1024 * 1024)).toFixed(1)} MB. Cloudinary Free Plan limits permanent storage to 100 MB. Please choose a video under 100 MB so it is permanently preserved!`
+        });
+      } else {
+        setMessage(null);
+      }
     }
   };
 
@@ -162,7 +169,7 @@ export default function UploadForm({ onUploadSuccess }) {
             {file ? "Change selected video" : "Select a video"}
           </div>
           <div className="dropzone-hint">
-            Supports MP4, WebM, MOV (Max 500MB)
+            Supports MP4, WebM, MOV (Max 100MB for permanent cloud storage)
           </div>
         </label>
 
