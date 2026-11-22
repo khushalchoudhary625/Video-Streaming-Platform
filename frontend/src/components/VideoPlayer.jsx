@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ThumbsUp, Share2, Server, Download, Trash2, Radio, Zap, Globe2 } from "lucide-react";
+import { ThumbsUp, Share2, Server, Download, Trash2, Radio, Zap, Globe2, AlertCircle } from "lucide-react";
 import VideoCard from "./VideoCard";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -15,6 +15,11 @@ export default function VideoPlayer({ video, recommendedVideos = [], onPlay, onD
   const [latencies, setLatencies] = useState({ delhi: null, mumbai: null });
   const [probing, setProbing] = useState(false);
   const [routingStatus, setRoutingStatus] = useState("Probing nearest CDN edge node...");
+  const [playbackError, setPlaybackError] = useState(false);
+
+  useEffect(() => {
+    setPlaybackError(false);
+  }, [selectedNode, video?.id]);
 
   // Probe latency to an edge node using its /health endpoint
   const pingNode = async (url) => {
@@ -215,10 +220,24 @@ export default function VideoPlayer({ video, recommendedVideos = [], onPlay, onD
             onPlay={() => {
               if (onPlay) onPlay(video.id);
             }}
+            onError={() => {
+              console.warn(`[VideoPlayer] Playback error on ${nodeLabel}: ${videoSrc}`);
+              setPlaybackError(true);
+            }}
           >
             Your browser does not support HTML5 video streaming.
           </video>
         </div>
+
+        {playbackError && (
+          <div className="alert-message error" style={{ marginTop: "12px", marginBottom: "8px" }}>
+            <AlertCircle size={16} />
+            <span>
+              Unable to play from <strong>{nodeLabel}</strong>. The cached file may be incomplete or corrupted. 
+              Click <strong>Purge Cache</strong> in the Admin Cloud Dashboard to reset it, or switch to Delhi / Origin.
+            </span>
+          </div>
+        )}
 
         <h1 className="watch-title">{video.title}</h1>
 

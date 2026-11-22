@@ -11,13 +11,15 @@ import {
   Clock, 
   TrendingUp, 
   Database,
-  ArrowRight
+  ArrowRight,
+  Trash2
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { ORIGIN_API_URL } from "../config/api";
+import { ORIGIN_API_URL, DELHI_EDGE_URL, MUMBAI_EDGE_URL } from "../config/api";
 
 export default function CloudDashboard() {
   const { token, isAdmin } = useAuth();
+  const [purgingNode, setPurgingNode] = useState(null);
 
   const [metricsData, setMetricsData] = useState({
     overview: {
@@ -101,6 +103,23 @@ export default function CloudDashboard() {
       if (isManual) setLoading(false);
     }
   }, [isAdmin, token]);
+
+  const handlePurgeCache = async (edgeUrl, edgeName) => {
+    if (!window.confirm(`Purge cache for ${edgeName} Node? All local video segments will be cleared and freshly re-cached from Origin on next play.`)) {
+      return;
+    }
+    setPurgingNode(edgeName);
+    try {
+      const res = await fetch(`${edgeUrl}/cache`, { method: "DELETE" });
+      const data = await res.json();
+      alert(`[${edgeName}] Cache Purged! ${data.deletedFiles ?? 0} files removed.`);
+      fetchMetrics(true);
+    } catch (err) {
+      alert(`Failed to purge cache for ${edgeName}: ${err.message}`);
+    } finally {
+      setPurgingNode(null);
+    }
+  };
 
   useEffect(() => {
     fetchMetrics();
@@ -275,10 +294,35 @@ export default function CloudDashboard() {
               <Radio size={16} color={delhi.online ? "#10b981" : "#ef4444"} />
               <span>Delhi Edge Server {delhi.port ? `(Port ${delhi.port})` : ""}</span>
             </div>
-            <span className={`edge-status-pill ${delhi.online ? "online" : "offline"}`}>
-              <span className="status-dot-pulse"></span>
-              {delhi.online ? "ONLINE" : "OFFLINE"}
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {delhi.online && (
+                <button
+                  className="btn-purge-cache"
+                  onClick={() => handlePurgeCache(DELHI_EDGE_URL, "Delhi")}
+                  disabled={purgingNode === "Delhi"}
+                  title="Purge Delhi edge disk cache"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "3px 8px",
+                    fontSize: "0.72rem",
+                    borderRadius: "6px",
+                    border: "1px solid #fecaca",
+                    color: "#dc2626",
+                    backgroundColor: "#fef2f2",
+                    cursor: "pointer"
+                  }}
+                >
+                  <Trash2 size={12} />
+                  <span>{purgingNode === "Delhi" ? "Purging..." : "Purge Cache"}</span>
+                </button>
+              )}
+              <span className={`edge-status-pill ${delhi.online ? "online" : "offline"}`}>
+                <span className="status-dot-pulse"></span>
+                {delhi.online ? "ONLINE" : "OFFLINE"}
+              </span>
+            </div>
           </div>
 
           <div className="edge-mini-stats">
@@ -328,10 +372,35 @@ export default function CloudDashboard() {
               <Radio size={16} color={mumbai.online ? "#10b981" : "#ef4444"} />
               <span>Mumbai Edge Server {mumbai.port ? `(Port ${mumbai.port})` : ""}</span>
             </div>
-            <span className={`edge-status-pill ${mumbai.online ? "online" : "offline"}`}>
-              <span className="status-dot-pulse"></span>
-              {mumbai.online ? "ONLINE" : "OFFLINE"}
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {mumbai.online && (
+                <button
+                  className="btn-purge-cache"
+                  onClick={() => handlePurgeCache(MUMBAI_EDGE_URL, "Mumbai")}
+                  disabled={purgingNode === "Mumbai"}
+                  title="Purge Mumbai edge disk cache"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "3px 8px",
+                    fontSize: "0.72rem",
+                    borderRadius: "6px",
+                    border: "1px solid #fecaca",
+                    color: "#dc2626",
+                    backgroundColor: "#fef2f2",
+                    cursor: "pointer"
+                  }}
+                >
+                  <Trash2 size={12} />
+                  <span>{purgingNode === "Mumbai" ? "Purging..." : "Purge Cache"}</span>
+                </button>
+              )}
+              <span className={`edge-status-pill ${mumbai.online ? "online" : "offline"}`}>
+                <span className="status-dot-pulse"></span>
+                {mumbai.online ? "ONLINE" : "OFFLINE"}
+              </span>
+            </div>
           </div>
 
           <div className="edge-mini-stats">

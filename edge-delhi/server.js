@@ -14,7 +14,7 @@ const ORIGIN_URL = (process.env.ORIGIN_URL || defaultOrigin).replace(/\/+$/, "")
 const CACHE_DIR = path.resolve(__dirname, process.env.CACHE_DIR || "./cache");
 const CACHE_TTL_SECONDS = parseInt(process.env.CACHE_TTL_SECONDS || 86400, 10);
 const MAX_CACHE_SIZE_MB = parseInt(process.env.MAX_CACHE_SIZE_MB || 1024, 10);
-const ORIGIN_TIMEOUT_MS = parseInt(process.env.ORIGIN_TIMEOUT_MS || 20000, 10);
+const ORIGIN_TIMEOUT_MS = parseInt(process.env.ORIGIN_TIMEOUT_MS || 120000, 10);
 
 const cacheManager = new CacheManager({
   edgeName: EDGE_NAME,
@@ -27,7 +27,12 @@ const cacheManager = new CacheManager({
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "HEAD", "OPTIONS", "DELETE"],
+  allowedHeaders: ["Range", "Authorization", "Content-Type", "Accept"],
+  exposedHeaders: ["Content-Range", "Accept-Ranges", "Content-Length", "X-Cache", "X-Edge-Location", "X-Edge-Origin"]
+}));
 app.use(express.json());
 
 // Request logger

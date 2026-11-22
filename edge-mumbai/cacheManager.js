@@ -157,8 +157,10 @@ class CacheManager {
 
     try {
       const stats = fs.statSync(filePath);
-      if (stats.size === 0) {
-        fs.unlinkSync(filePath);
+      // Corrupted 0-byte or under 1KB file (incomplete / error response), purge
+      if (stats.size < 1024) {
+        console.warn(`[${this.edgeName}] [PURGE CORRUPT CACHE] ${filename} is only ${stats.size} bytes. Purging from cache.`);
+        try { fs.unlinkSync(filePath); } catch (e) {}
         return false;
       }
 
@@ -166,7 +168,7 @@ class CacheManager {
         const ageSeconds = (Date.now() - stats.mtimeMs) / 1000;
         if (ageSeconds > this.ttlSeconds) {
           console.log(`[${this.edgeName}] [CACHE EXPIRED] ${filename} age (${Math.round(ageSeconds)}s) exceeded TTL (${this.ttlSeconds}s)`);
-          fs.unlinkSync(filePath);
+          try { fs.unlinkSync(filePath); } catch (e) {}
           return false;
         }
       }
@@ -277,6 +279,7 @@ class CacheManager {
 
             fileStream = fs.createWriteStream(tempPath);
             let downloadedBytes = 0;
+            const expectedSize = parseInt(res.headers["content-length"] || "0", 10);
 
             res.on("data", (chunk) => {
               downloadedBytes += chunk.length;
@@ -286,11 +289,22 @@ class CacheManager {
 
             fileStream.on("finish", () => {
               fileStream.close(async () => {
-                if (downloadedBytes === 0) {
+                // If fetch was already aborted/cancelled, delete temp file and abort
+                if (isResolved) {
+                  if (fs.existsSync(tempPath)) {
+                    try { fs.unlinkSync(tempPath); } catch (e) {}
+                  }
+                  return;
+                }
+
+                if (downloadedBytes === 0 || (expectedSize > 0 && downloadedBytes < expectedSize)) {
+                  console.error(
+                    `[${this.edgeName}] [INCOMPLETE FETCH] Expected ${expectedSize} bytes but got ${downloadedBytes}. Discarding partial file.`
+                  );
                   return safeCleanupAndResolve({
                     success: false,
                     statusCode: 502,
-                    error: "Origin sent empty 0-byte video"
+                    error: `Origin media transfer cut off (${downloadedBytes} / ${expectedSize} bytes)`
                   });
                 }
 
@@ -392,6 +406,12 @@ class CacheManager {
     res.setHeader("X-Edge-Location", this.edgeName);
     res.setHeader("X-Edge-Origin", this.originUrl);
     res.setHeader("Last-Modified", stats.mtime.toUTCString());
+
+    // Explicit CORS headers for seamless cross-origin video playback and range scrubbing
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Range, Authorization, Content-Type, Accept");
+    res.setHeader("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges, Content-Length, X-Cache, X-Edge-Location, X-Edge-Origin");
 
     try {
       const now = new Date();
