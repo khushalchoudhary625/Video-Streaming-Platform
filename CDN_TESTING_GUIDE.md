@@ -1,4 +1,4 @@
-# StreamCloud CDN Edge Servers - Testing & Evaluation Guide
+# NetNoflix CDN Edge Servers - Testing & Evaluation Guide
 
 This guide walks you through starting the **Origin Server** (Port 3000), **Delhi Edge Server** (Port 4001), and **Mumbai Edge Server** (Port 4002), and testing cache hit/miss behavior, range requests, seeking, and offline survival.
 
@@ -34,7 +34,7 @@ npm start
 *Expected log:*
 ```text
 ====================================================
-  StreamCloud CDN Edge Server - Delhi Node
+  NetNoflix CDN Edge Server - Delhi Node
   Running on: http://localhost:4001
   Origin URL: http://localhost:3000
   Cache Dir:  ...\edge-delhi\cache
@@ -50,7 +50,7 @@ npm start
 *Expected log:*
 ```text
 ====================================================
-  StreamCloud CDN Edge Server - Mumbai Node
+  NetNoflix CDN Edge Server - Mumbai Node
   Running on: http://localhost:4002
   Origin URL: http://localhost:3000
   Cache Dir:  ...\edge-mumbai\cache

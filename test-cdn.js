@@ -1,5 +1,5 @@
 /**
- * StreamCloud CDN Edge Servers Verification Suite
+ * NetNoflix CDN Edge Servers Verification Suite
  *
  * Tests:
  * 1. Health checks on Origin (5000), Delhi Edge (4001), and Mumbai Edge (4002)
@@ -65,7 +65,7 @@ function makeRequest(url, options = {}) {
 
 async function runTests() {
   console.log("========================================================");
-  console.log("  StreamCloud CDN Edge Servers - Verification Test Suite");
+  console.log("  NetNoflix CDN Edge Servers - Verification Test Suite");
   console.log("========================================================\n");
 
   let passed = 0;

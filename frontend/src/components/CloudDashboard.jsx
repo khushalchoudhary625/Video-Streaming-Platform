@@ -199,8 +199,8 @@ export default function CloudDashboard() {
       <div className="cloud-dashboard-header">
         <div>
           <div className="cloud-title">
-            <Server size={22} color="#2563eb" />
-            <span>StreamCloud CDN & Edge Telemetry Dashboard</span>
+            <Server size={22} color="#E50914" />
+            <span>NetNoflix CDN & Edge Telemetry Dashboard</span>
           </div>
           <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "3px" }}>
             Real-time live metrics aggregated across Origin (5000), Delhi Edge (4001) and Mumbai Edge (4002)

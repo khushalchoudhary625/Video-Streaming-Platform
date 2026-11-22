@@ -41,7 +41,7 @@ export default function Navbar({
           <div className="brand-icon">
             <Play size={18} fill="currentColor" />
           </div>
-          <span>StreamCloud</span>
+          <span className="brand-name">NetNoflix</span>
         </Link>
       </div>
 

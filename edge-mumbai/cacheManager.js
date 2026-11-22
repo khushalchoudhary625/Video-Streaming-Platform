@@ -245,7 +245,7 @@ class CacheManager {
           {
             timeout: this.originTimeoutMs,
             headers: {
-              "User-Agent": `StreamCloud-Edge/${this.edgeName}`
+              "User-Agent": `NetNoflix-Edge/${this.edgeName}`
             }
           },
           (res) => {

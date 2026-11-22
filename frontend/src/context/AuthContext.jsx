@@ -6,7 +6,7 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     try {
-      const saved = localStorage.getItem("streamcloud_user");
+      const saved = localStorage.getItem("netnoflix_user") || localStorage.getItem("streamcloud_user");
       return saved ? JSON.parse(saved) : null;
     } catch (e) {
       return null;
@@ -18,8 +18,9 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem("streamcloud_user", JSON.stringify(user));
+      localStorage.setItem("netnoflix_user", JSON.stringify(user));
     } else {
+      localStorage.removeItem("netnoflix_user");
       localStorage.removeItem("streamcloud_user");
     }
   }, [user]);
@@ -70,6 +71,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem("netnoflix_user");
     localStorage.removeItem("streamcloud_user");
   };
 

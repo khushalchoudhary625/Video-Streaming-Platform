@@ -5,9 +5,9 @@
   --text-primary: #1f2937;
   --text-secondary: #6b7280;
   --text-muted: #9ca3af;
-  --primary-accent: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-light: #eff6ff;
+  --primary-accent: #E50914;
+  --primary-hover: #b81d24;
+  --primary-light: rgba(229, 9, 20, 0.08);
   --border-color: #e5e7eb;
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
@@ -121,21 +121,31 @@ input, textarea, select {
 .brand-logo {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-primary);
+  gap: 10px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #E50914;
   letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.brand-name {
+  color: #E50914;
+  font-weight: 900;
+  font-size: 1.45rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .brand-icon {
-  background-color: var(--primary-accent);
+  background-color: #E50914;
   color: white;
   padding: 6px;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 8px rgba(229, 9, 20, 0.35);
 }
 
 .navbar-center {
@@ -156,7 +166,7 @@ input, textarea, select {
 
 .search-box:focus-within {
   border-color: var(--primary-accent);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.15);
   background-color: var(--bg-card);
 }
 

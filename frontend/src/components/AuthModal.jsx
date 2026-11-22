@@ -47,7 +47,7 @@ export default function AuthModal() {
           <p className="modal-subtitle">
             {authMode === "login"
               ? "Sign in to access your video streaming dashboard"
-              : "Register to join StreamCloud platform"}
+              : "Register to join NetNoflix platform"}
           </p>
         </div>
 

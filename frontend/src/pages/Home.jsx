@@ -47,7 +47,7 @@ export default function Home({
       <div className="hero-banner">
         <div>
           <div className="hero-badge">Cloud Computing CDN Project</div>
-          <h1 className="hero-title">Welcome to StreamCloud</h1>
+          <h1 className="hero-title">Welcome to NetNoflix</h1>
           <p className="hero-subtitle">
             Watch and share high-definition videos with low latency content delivery.
           </p>

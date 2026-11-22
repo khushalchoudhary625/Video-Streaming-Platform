@@ -1,4 +1,4 @@
-// Vercel Serverless Function for StreamCloud API
+// Vercel Serverless Function for NetNoflix API
 // Handles /api/videos, /api/videos/metrics, /api/auth/* directly on Vercel
 
 export default async function handler(req, res) {
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   const sampleVideos = [
     {
       id: "1791289315853-250274887",
-      title: "StreamCloud CDN Demonstration Stream",
+      title: "NetNoflix CDN Demonstration Stream",
       description: "High-definition video showcasing multi-node edge caching, HTTP range requests, and low latency streaming.",
       filename: "1791289315853-250274887.mp4",
       url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
       views: 84,
       duration: "10:53",
       uploadDate: "Recently",
-      uploaderName: "StreamCloud Team",
+      uploaderName: "NetNoflix Team",
       isUserUploaded: false
     }
   ];
@@ -185,7 +185,7 @@ export default async function handler(req, res) {
 
   // 6. POST /api/auth/login -> User login
   if (url.includes("/api/auth/login") && method === "POST") {
-    const email = body?.email || "admin@streamcloud.com";
+    const email = body?.email || "admin@netnoflix.com";
     const isAdmin = email.includes("admin");
     return res.status(200).json({
       message: "Login successful",
@@ -208,7 +208,7 @@ export default async function handler(req, res) {
       user: {
         id: "usr_" + Date.now(),
         name: body?.name || "New User",
-        email: body?.email || "user@streamcloud.com",
+        email: body?.email || "user@netnoflix.com",
         role: role
       }
     });
@@ -220,7 +220,7 @@ export default async function handler(req, res) {
       user: {
         id: "usr_active",
         name: "Demonstration User",
-        email: "demo@streamcloud.com",
+        email: "demo@netnoflix.com",
         role: "admin"
       }
     });

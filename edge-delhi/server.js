@@ -43,7 +43,7 @@ app.use((req, res, next) => {
 // Root welcome & info route
 app.get("/", (req, res) => {
   res.json({
-    name: `StreamCloud CDN Edge Server (${EDGE_NAME} Node)`,
+    name: `NetNoflix CDN Edge Server (${EDGE_NAME} Node)`,
     edge: EDGE_NAME,
     port: PORT,
     originUrl: ORIGIN_URL,
@@ -157,7 +157,7 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`====================================================`);
-  console.log(`  StreamCloud CDN Edge Server - ${EDGE_NAME} Node`);
+  console.log(`  NetNoflix CDN Edge Server - ${EDGE_NAME} Node`);
   console.log(`  Running on: http://localhost:${PORT}`);
   console.log(`  Origin URL: ${ORIGIN_URL}`);
   console.log(`  Cache Dir:  ${cacheManager.cacheDir}`);

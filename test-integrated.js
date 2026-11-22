@@ -58,7 +58,7 @@ function waitForHttp(url, timeoutMs = 25000) {
 
 async function run() {
   console.log("=================================================");
-  console.log("  StreamCloud Automated CDN Test Orchestrator");
+  console.log("  NetNoflix Automated CDN Test Orchestrator");
   console.log("=================================================\n");
 
   const processes = [];
