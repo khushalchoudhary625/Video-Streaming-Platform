@@ -99,7 +99,7 @@ export default function VideoPlayer({ video, recommendedVideos = [], onPlay, onD
     nodeLabel = `Mumbai Edge Node${latencies.mumbai !== null && latencies.mumbai !== Infinity ? ` (${latencies.mumbai}ms)` : ""}`;
   } else {
     videoSrc = `${ORIGIN_API_URL}/videos/${filename}`;
-    nodeLabel = "Origin Server (Port 5000)";
+    nodeLabel = "Origin Server";
   }
 
   const handleDelete = async () => {

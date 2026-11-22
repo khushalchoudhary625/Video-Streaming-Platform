@@ -203,7 +203,7 @@ export default function CloudDashboard() {
             <span>NetNoflix CDN & Edge Telemetry Dashboard</span>
           </div>
           <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: "3px" }}>
-            Real-time live metrics aggregated across Origin (5000), Delhi Edge (4001) and Mumbai Edge (4002)
+            Real-time live telemetry aggregated across NetNoflix Origin, Delhi Edge (CDN 1), and Mumbai Edge (CDN 2)
           </div>
         </div>
 
@@ -263,7 +263,7 @@ export default function CloudDashboard() {
 
       {/* 2. Edge Servers Comparison: Delhi vs Mumbai */}
       <div className="dashboard-subheading">
-        <Activity size={18} color="#2563eb" />
+        <Activity size={18} color="#E50914" />
         <span>Custom CDN Edge Nodes: Real-Time Status & Performance</span>
       </div>
 

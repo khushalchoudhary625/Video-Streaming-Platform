@@ -8,7 +8,9 @@ const app = express();
 
 const PORT = parseInt(process.env.PORT || 4001, 10);
 const EDGE_NAME = process.env.EDGE_NAME || "Delhi";
-const ORIGIN_URL = process.env.ORIGIN_URL || "http://localhost:5000";
+const isProduction = process.env.NODE_ENV === "production" || !process.env.NODE_ENV || process.env.RENDER;
+const defaultOrigin = isProduction ? "https://netnoflix.onrender.com" : "http://localhost:5000";
+const ORIGIN_URL = (process.env.ORIGIN_URL || defaultOrigin).replace(/\/+$/, "");
 const CACHE_DIR = path.resolve(__dirname, process.env.CACHE_DIR || "./cache");
 const CACHE_TTL_SECONDS = parseInt(process.env.CACHE_TTL_SECONDS || 86400, 10);
 const MAX_CACHE_SIZE_MB = parseInt(process.env.MAX_CACHE_SIZE_MB || 1024, 10);

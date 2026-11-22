@@ -8,7 +8,7 @@ const { cloudinary, isCloudinaryConfigured } = require("../config/cloudinary");
 const fetchEdgeMetrics = async (url) => {
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const timeoutId = setTimeout(() => controller.abort(), 7000);
 
         const res = await fetch(url, {
             signal: controller.signal,
@@ -300,8 +300,8 @@ const getCloudMetrics = async (req, res) => {
 
         // Determine active Edge Node URLs (supports cloud deployment and local testing)
         const isProduction = process.env.NODE_ENV === "production" || !process.env.NODE_ENV;
-        const defaultDelhi = isProduction ? "https://video-streaming-platform-2-29ky.onrender.com" : "http://localhost:4001";
-        const defaultMumbai = isProduction ? "https://video-streaming-platform-1-l7z7.onrender.com" : "http://localhost:4002";
+        const defaultDelhi = isProduction ? "https://netnoflix-cdn1.onrender.com" : "http://localhost:4001";
+        const defaultMumbai = isProduction ? "https://netnoflix-cdn2.onrender.com" : "http://localhost:4002";
         const delhiBaseUrl = (process.env.DELHI_EDGE_URL || defaultDelhi).replace(/\/+$/, "");
         const mumbaiBaseUrl = (process.env.MUMBAI_EDGE_URL || defaultMumbai).replace(/\/+$/, "");
 
