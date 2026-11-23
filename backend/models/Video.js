@@ -26,6 +26,10 @@ const videoSchema = new mongoose.Schema({
         type: String,
         default: ""
     },
+    thumbnail: {
+        type: String,
+        default: ""
+    },
     size: {
         type: Number,
         default: 0
@@ -36,7 +40,7 @@ const videoSchema = new mongoose.Schema({
     },
     duration: {
         type: String,
-        default: "04:15"
+        default: ""
     },
     uploader: {
         type: mongoose.Schema.Types.ObjectId,

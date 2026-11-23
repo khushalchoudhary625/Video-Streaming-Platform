@@ -14,6 +14,8 @@ export default function UploadForm({ onUploadSuccess }) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState(null);
+  const [detectedDuration, setDetectedDuration] = useState("");
+  const [detectedThumbnail, setDetectedThumbnail] = useState("");
 
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
@@ -30,6 +32,49 @@ export default function UploadForm({ onUploadSuccess }) {
         });
       } else {
         setMessage(null);
+      }
+
+      // Automatically inspect actual duration and grab a thumbnail frame
+      try {
+        const videoEl = document.createElement("video");
+        videoEl.preload = "metadata";
+        videoEl.muted = true;
+        videoEl.playsInline = true;
+        const objectUrl = URL.createObjectURL(selected);
+        videoEl.src = objectUrl;
+
+        videoEl.onloadedmetadata = () => {
+          if (videoEl.duration && isFinite(videoEl.duration)) {
+            const totalSecs = Math.round(videoEl.duration);
+            const mins = Math.floor(totalSecs / 60);
+            const secs = totalSecs % 60;
+            const durStr = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+            setDetectedDuration(durStr);
+            videoEl.currentTime = Math.min(1, Math.max(0.2, totalSecs / 4));
+          }
+        };
+
+        videoEl.onseeked = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = 480;
+            canvas.height = 270;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+            const thumbData = canvas.toDataURL("image/jpeg", 0.7);
+            setDetectedThumbnail(thumbData);
+          } catch (err) {
+            // ignore canvas security/cross-origin
+          } finally {
+            URL.revokeObjectURL(objectUrl);
+          }
+        };
+
+        videoEl.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+        };
+      } catch (err) {
+        console.warn("Could not preview video metadata:", err);
       }
     }
   };
@@ -65,6 +110,12 @@ export default function UploadForm({ onUploadSuccess }) {
     formData.append("video", file);
     formData.append("title", title);
     formData.append("description", description);
+    if (detectedDuration) {
+      formData.append("duration", detectedDuration);
+    }
+    if (detectedThumbnail) {
+      formData.append("thumbnail", detectedThumbnail);
+    }
 
     setUploading(true);
     setProgress(30);
@@ -179,7 +230,14 @@ export default function UploadForm({ onUploadSuccess }) {
               <FileVideo size={18} color="var(--primary-accent)" />
               <span className="file-name">{file.name}</span>
             </div>
-            <span className="file-size">{formatFileSize(file.size)}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {detectedDuration && (
+                <span className="file-size" style={{ color: "var(--primary-accent)", fontWeight: 600 }}>
+                  Duration: {detectedDuration}
+                </span>
+              )}
+              <span className="file-size">{formatFileSize(file.size)}</span>
+            </div>
           </div>
         )}
 

@@ -216,7 +216,7 @@ export default function VideoPlayer({ video, recommendedVideos = [], onPlay, onD
             controlsList="nodownload"
             preload="metadata"
             className="video-element"
-            poster={video.thumbnail || ""}
+            poster={video.thumbnail || (video.cloudinaryUrl ? video.cloudinaryUrl.replace(/\.[^/.]+$/, ".jpg") : "")}
             onPlay={() => {
               if (onPlay) onPlay(video.id);
             }}

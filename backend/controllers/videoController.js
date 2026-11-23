@@ -71,23 +71,31 @@ const getVideos = async (req, res) => {
         // Query all videos from MongoDB
         const dbVideos = await Video.find().sort({ createdAt: -1 });
 
-        const formatted = dbVideos.map((v) => ({
-            id: v._id.toString(),
-            title: v.title,
-            description: v.description,
-            filename: v.filename,
-            url: v.url,
-            size: v.size,
-            views: v.views || 0,
-            duration: v.duration || "04:15",
-            uploadDate: new Date(v.createdAt).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric"
-            }),
-            uploaderName: v.uploaderName || "Admin",
-            isUserUploaded: true
-        }));
+        const formatted = dbVideos.map((v) => {
+            // Determine thumbnail: explicit thumbnail or Cloudinary generated jpg
+            const thumbnail = v.thumbnail || (v.cloudinaryUrl ? v.cloudinaryUrl.replace(/\.[^/.]+$/, ".jpg") : "");
+            const hasRealDuration = v.duration && v.duration !== "04:15" && v.duration !== "04:30";
+
+            return {
+                id: v._id.toString(),
+                title: v.title,
+                description: v.description,
+                filename: v.filename,
+                url: v.url,
+                cloudinaryUrl: v.cloudinaryUrl || "",
+                thumbnail: thumbnail,
+                size: v.size,
+                views: v.views || 0,
+                duration: hasRealDuration ? v.duration : "",
+                uploadDate: new Date(v.createdAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric"
+                }),
+                uploaderName: v.uploaderName || "Admin",
+                isUserUploaded: true
+            };
+        });
 
         res.json(formatted);
     } catch (error) {
@@ -155,6 +163,13 @@ const uploadVideo = async (req, res) => {
             console.log("[Cloudinary] Not configured. Video stored only on local disk.");
         }
 
+        let calculatedDuration = (req.body.duration || "").trim();
+        let calculatedThumbnail = (req.body.thumbnail || "").trim();
+
+        if (cloudinaryUrl && !calculatedThumbnail) {
+            calculatedThumbnail = cloudinaryUrl.replace(/\.[^/.]+$/, ".jpg");
+        }
+
         // Save to MongoDB
         const savedVideo = await Video.create({
             title,
@@ -163,9 +178,10 @@ const uploadVideo = async (req, res) => {
             url: videoUrl,
             cloudinaryUrl,
             cloudinaryId,
+            thumbnail: calculatedThumbnail,
             size: req.file.size,
             views: 0,
-            duration: req.body.duration || "04:30",
+            duration: calculatedDuration,
             uploader: req.user ? req.user._id : null,
             uploaderName: req.user ? req.user.name : "Admin"
         });
@@ -186,8 +202,10 @@ const uploadVideo = async (req, res) => {
                 description: savedVideo.description,
                 filename: savedVideo.filename,
                 url: savedVideo.url,
+                thumbnail: savedVideo.thumbnail,
                 size: savedVideo.size,
                 views: savedVideo.views,
+                duration: savedVideo.duration,
                 uploadDate: "Just now",
                 uploaderName: savedVideo.uploaderName,
                 isUserUploaded: true
